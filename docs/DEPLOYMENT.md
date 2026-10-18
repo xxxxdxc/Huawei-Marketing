@@ -4,7 +4,7 @@
 
 ## 部署方式
 
-Docker 类型，CPU 资源，服务监听 `0.0.0.0:7860`。使用单个 uvicorn worker；当前任务编排使用进程内锁和后台任务，不应简单增加 workers。生产前端构建产物由同一 FastAPI 服务提供。
+Docker 类型，使用当前空间可用的免费 CPU 资源 platform/2v-cpu-8g-mem，服务监听 `0.0.0.0:7860`。使用单个 uvicorn worker；当前任务编排使用进程内锁和后台任务，不应简单增加 workers。生产前端构建产物由同一 FastAPI 服务提供。
 
 Dockerfile 使用 Node.js 22 构建前端；Python 3.12 运行后端，并保留 Node.js 执行 ima 客户端脚本。依赖由前后端锁文件安装。
 
