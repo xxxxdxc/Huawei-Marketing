@@ -1,0 +1,2783 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "华为 PC 门店图文助手",
+    "version": "0.5.1"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "Settings",
+        "operationId": "settings_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Settings",
+        "operationId": "update_settings_api_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/knowledge-source": {
+      "put": {
+        "summary": "Update Knowledge Source",
+        "operationId": "update_knowledge_source_api_settings_knowledge_source_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSourceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/probe": {
+      "post": {
+        "summary": "Probe",
+        "operationId": "probe_api_settings_probe_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog": {
+      "get": {
+        "summary": "Catalog",
+        "operationId": "catalog_api_catalog_get",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ima",
+                    "local_zip"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "get": {
+        "summary": "Tasks",
+        "operationId": "tasks_api_tasks_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Task",
+        "operationId": "create_task_api_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}": {
+      "get": {
+        "summary": "Get Task",
+        "operationId": "get_task_api_tasks__tid__get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/history": {
+      "get": {
+        "summary": "History",
+        "operationId": "history_api_tasks__tid__history_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/restore": {
+      "post": {
+        "summary": "Restore",
+        "operationId": "restore_api_tasks__tid__restore_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restore"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_api_tasks__tid__analyze_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/brief/answers": {
+      "post": {
+        "summary": "Answer Brief",
+        "operationId": "answer_brief_api_tasks__tid__brief_answers_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefAnswers"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/confirm-brief": {
+      "post": {
+        "summary": "Confirm Brief",
+        "operationId": "confirm_brief_api_tasks__tid__confirm_brief_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/resume-plan": {
+      "post": {
+        "summary": "Resume Plan",
+        "operationId": "resume_plan_api_tasks__tid__resume_plan_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/plan": {
+      "put": {
+        "summary": "Save Plan",
+        "operationId": "save_plan_api_tasks__tid__plan_put",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/confirm-plan": {
+      "post": {
+        "summary": "Confirm Plan",
+        "operationId": "confirm_plan_api_tasks__tid__confirm_plan_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/document": {
+      "put": {
+        "summary": "Edit Document",
+        "operationId": "edit_document_api_tasks__tid__document_put",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/review": {
+      "post": {
+        "summary": "Review",
+        "operationId": "review_api_tasks__tid__review_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/evidence-review": {
+      "get": {
+        "summary": "Evidence Review",
+        "operationId": "evidence_review_api_tasks__tid__evidence_review_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/evidence-resolution/preview": {
+      "post": {
+        "summary": "Preview Evidence Resolution",
+        "operationId": "preview_evidence_resolution_api_tasks__tid__evidence_resolution_preview_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceResolutionPreview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/evidence-resolution/confirm": {
+      "post": {
+        "summary": "Confirm Evidence Resolution",
+        "operationId": "confirm_evidence_resolution_api_tasks__tid__evidence_resolution_confirm_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceResolutionConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/refresh-evidence": {
+      "post": {
+        "summary": "Refresh Evidence",
+        "operationId": "refresh_evidence_api_tasks__tid__refresh_evidence_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/replan": {
+      "post": {
+        "summary": "Retry Replan",
+        "operationId": "retry_replan_api_tasks__tid__replan_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/change-platform": {
+      "post": {
+        "summary": "Change Platform",
+        "operationId": "change_platform_api_tasks__tid__change_platform_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/modify": {
+      "post": {
+        "summary": "Modify",
+        "operationId": "modify_api_tasks__tid__modify_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Modify"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/{iid}": {
+      "get": {
+        "summary": "Asset",
+        "operationId": "asset_api_assets__iid__get",
+        "parameters": [
+          {
+            "name": "iid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/export": {
+      "get": {
+        "summary": "Export",
+        "operationId": "export_api_tasks__tid__export_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          },
+          {
+            "name": "bundle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Bundle"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Index",
+        "operationId": "index__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AudienceInsight": {
+        "properties": {
+          "job_to_be_done": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Job To Be Done"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Problems"
+          },
+          "decision_factors": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonedPoint"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Decision Factors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_to_be_done",
+          "problems",
+          "decision_factors"
+        ],
+        "title": "AudienceInsight"
+      },
+      "Brief": {
+        "properties": {
+          "audience": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Audience"
+          },
+          "scenario": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Scenario"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "xiaohongshu",
+              "wechat",
+              "moments"
+            ],
+            "title": "Platform"
+          },
+          "goal": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Goal"
+          },
+          "purchase_stage": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Purchase Stage"
+          },
+          "pain_points": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pain Points"
+          },
+          "strategy": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Strategy"
+          },
+          "tone": {
+            "type": "string",
+            "title": "Tone"
+          },
+          "emphasis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Emphasis"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "audience",
+          "scenario",
+          "platform",
+          "goal",
+          "purchase_stage",
+          "pain_points",
+          "strategy",
+          "tone",
+          "emphasis",
+          "questions"
+        ],
+        "title": "Brief"
+      },
+      "BriefAnswer": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Question Id"
+          },
+          "answer": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Answer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_id",
+          "answer"
+        ],
+        "title": "BriefAnswer"
+      },
+      "BriefAnswers": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/BriefAnswer"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Answers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "answers"
+        ],
+        "title": "BriefAnswers"
+      },
+      "BriefQuestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "product_query",
+              "product_model",
+              "target_audience",
+              "scenario",
+              "buying_stage",
+              "customer_needs",
+              "marketing_goal",
+              "platform",
+              "user_constraints"
+            ],
+            "title": "Field"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "conflict"
+            ],
+            "title": "Kind"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Choices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "field",
+          "kind",
+          "question",
+          "reason",
+          "choices"
+        ],
+        "title": "BriefQuestion"
+      },
+      "BriefUpdate": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Brief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysis_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "BriefUpdate"
+      },
+      "CommercialNeed": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "price",
+              "promotion"
+            ],
+            "title": "Category"
+          },
+          "request": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Request"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Evidence"
+          },
+          "on_missing": {
+            "type": "string",
+            "enum": [
+              "omit",
+              "block"
+            ],
+            "title": "On Missing",
+            "default": "omit"
+          },
+          "blocking_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "title": "Blocking Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "request",
+          "evidence"
+        ],
+        "title": "CommercialNeed"
+      },
+      "Document": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "lead": {
+            "type": "string",
+            "title": "Lead"
+          },
+          "paragraphs": {
+            "items": {
+              "$ref": "#/components/schemas/Paragraph"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Paragraphs"
+          },
+          "cta": {
+            "type": "string",
+            "title": "Cta"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "lead",
+          "paragraphs",
+          "cta",
+          "tags"
+        ],
+        "title": "Document"
+      },
+      "DocumentUpdate": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "document"
+        ],
+        "title": "DocumentUpdate"
+      },
+      "EvidenceRef": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Turn Id"
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Quote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "turn_id",
+          "quote"
+        ],
+        "title": "EvidenceRef"
+      },
+      "EvidenceResolutionConfirm": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "drop_request_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Drop Request Ids"
+          },
+          "drop_direction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Drop Direction Ids"
+          },
+          "preview_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Preview Id"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "acknowledged_constraint_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Acknowledged Constraint Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "preview_id",
+          "confirmed"
+        ],
+        "title": "EvidenceResolutionConfirm"
+      },
+      "EvidenceResolutionPreview": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "drop_request_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Drop Request Ids"
+          },
+          "drop_direction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Drop Direction Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "EvidenceResolutionPreview"
+      },
+      "FactRequest": {
+        "properties": {
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Depends On"
+          },
+          "waivable": {
+            "type": "boolean",
+            "title": "Waivable",
+            "default": true
+          },
+          "guardrail": {
+            "type": "string",
+            "enum": [
+              "none",
+              "identity",
+              "safety",
+              "compatibility"
+            ],
+            "title": "Guardrail",
+            "default": "none"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "product",
+              "price",
+              "promotion"
+            ],
+            "title": "Category",
+            "default": "product"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id"
+          },
+          "direction_id": {
+            "type": "string",
+            "title": "Direction Id"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Conditions"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "required",
+              "supporting"
+            ],
+            "title": "Priority"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "direction_id",
+          "question",
+          "conditions",
+          "priority"
+        ],
+        "title": "FactRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImageRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id"
+          },
+          "direction_id": {
+            "type": "string",
+            "title": "Direction Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "direction_id",
+          "description",
+          "reason"
+        ],
+        "title": "ImageRequest"
+      },
+      "KnowledgeSourceUpdate": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "ima",
+              "local_zip"
+            ],
+            "title": "Source"
+          },
+          "local_knowledge_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Knowledge Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "KnowledgeSourceUpdate"
+      },
+      "ListField": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "explicit",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Source"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason"
+          },
+          "value": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "evidence",
+          "reason",
+          "value"
+        ],
+        "title": "ListField"
+      },
+      "MarketingBrief": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "2",
+            "title": "Schema Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "need_clarification",
+              "needs_resolution",
+              "ready"
+            ],
+            "title": "Status"
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/Requirements"
+          },
+          "commercial_requests": {
+            "items": {
+              "$ref": "#/components/schemas/CommercialNeed"
+            },
+            "type": "array",
+            "title": "Commercial Requests"
+          },
+          "product_resolution": {
+            "$ref": "#/components/schemas/ProductResolution"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/BriefQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "audience_insight": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudienceInsight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message_strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retrieval_plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetrievalPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "status",
+          "requirements",
+          "product_resolution",
+          "questions",
+          "audience_insight",
+          "message_strategy",
+          "retrieval_plan"
+        ],
+        "title": "MarketingBrief"
+      },
+      "MessageStrategy": {
+        "properties": {
+          "theme": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Theme"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "priorities": {
+            "items": {
+              "$ref": "#/components/schemas/SellingDirection"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Priorities"
+          },
+          "angle": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Angle"
+          },
+          "cta_direction": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Cta Direction"
+          },
+          "tone": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Tone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "theme",
+          "reason",
+          "priorities",
+          "angle",
+          "cta_direction",
+          "tone"
+        ],
+        "title": "MessageStrategy"
+      },
+      "Modify": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "instruction": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 2,
+            "title": "Instruction"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "instruction"
+        ],
+        "title": "Modify"
+      },
+      "NewTask": {
+        "properties": {
+          "knowledge_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ima",
+                  "local_zip"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Source"
+          },
+          "raw": {
+            "type": "string",
+            "maxLength": 6000,
+            "minLength": 4,
+            "title": "Raw"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "xiaohongshu",
+                  "wechat",
+                  "moments"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "raw"
+        ],
+        "title": "NewTask"
+      },
+      "Paragraph": {
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "heading": {
+            "type": "string",
+            "title": "Heading"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "image_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Id"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "section_id",
+          "heading",
+          "text",
+          "fact_ids",
+          "image_id",
+          "caption"
+        ],
+        "title": "Paragraph"
+      },
+      "Plan": {
+        "properties": {
+          "angle": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Angle"
+          },
+          "title_direction": {
+            "type": "string",
+            "title": "Title Direction"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSection"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Sections"
+          },
+          "cta": {
+            "type": "string",
+            "title": "Cta"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "angle",
+          "title_direction",
+          "sections",
+          "cta"
+        ],
+        "title": "Plan"
+      },
+      "PlanSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "heading": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Heading"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Purpose"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "image_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Id"
+          },
+          "image_reason": {
+            "type": "string",
+            "title": "Image Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "heading",
+          "purpose",
+          "fact_ids",
+          "image_id",
+          "image_reason"
+        ],
+        "title": "PlanSection"
+      },
+      "PlanUpdate": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "plan"
+        ],
+        "title": "PlanUpdate"
+      },
+      "PlatformChange": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "xiaohongshu",
+              "wechat",
+              "moments"
+            ],
+            "title": "Platform"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "platform"
+        ],
+        "title": "PlatformChange"
+      },
+      "ProductCandidate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category"
+        ],
+        "title": "ProductCandidate"
+      },
+      "ProductResolution": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "ambiguous",
+              "resolved"
+            ],
+            "title": "State"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "product_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Model"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ProductCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "product_id",
+          "product_model",
+          "candidates"
+        ],
+        "title": "ProductResolution"
+      },
+      "ReasonedPoint": {
+        "properties": {
+          "point": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Point"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "point",
+          "reason"
+        ],
+        "title": "ReasonedPoint"
+      },
+      "Requirements": {
+        "properties": {
+          "product_query": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "product_model": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "target_audience": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "buying_stage": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "customer_needs": {
+            "$ref": "#/components/schemas/ListField"
+          },
+          "marketing_goal": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/TextField"
+          },
+          "user_constraints": {
+            "$ref": "#/components/schemas/ListField"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "product_query",
+          "product_model",
+          "target_audience",
+          "scenario",
+          "buying_stage",
+          "customer_needs",
+          "marketing_goal",
+          "platform",
+          "user_constraints"
+        ],
+        "title": "Requirements"
+      },
+      "Restore": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "target_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Target Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "target_version"
+        ],
+        "title": "Restore"
+      },
+      "RetrievalPlan": {
+        "properties": {
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactRequest"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Facts"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageRequest"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Images"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "facts",
+          "images"
+        ],
+        "title": "RetrievalPlan"
+      },
+      "SellingDirection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Direction"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "customer_needs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Customer Needs"
+          },
+          "verification": {
+            "type": "string",
+            "const": "pending",
+            "title": "Verification"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "reason",
+          "customer_needs",
+          "verification"
+        ],
+        "title": "SellingDirection"
+      },
+      "SettingsUpdate": {
+        "properties": {
+          "knowledge_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ima",
+                  "local_zip"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Source"
+          },
+          "local_knowledge_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Knowledge Path"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "writer_model": {
+            "type": "string",
+            "title": "Writer Model"
+          },
+          "reviewer_model": {
+            "type": "string",
+            "title": "Reviewer Model"
+          },
+          "vision": {
+            "type": "boolean",
+            "title": "Vision"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "reviewer_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Api Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "base_url",
+          "writer_model",
+          "reviewer_model",
+          "vision"
+        ],
+        "title": "SettingsUpdate"
+      },
+      "TaskView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "xiaohongshu",
+                  "wechat",
+                  "moments"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Brief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brief_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketingBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brief_analysis_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Analysis Hash"
+          },
+          "brief_confirmation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Confirmation"
+          },
+          "dialogue": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Dialogue"
+          },
+          "brief_runs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Brief Runs"
+          },
+          "can_export": {
+            "type": "boolean",
+            "title": "Can Export",
+            "default": false
+          },
+          "knowledge_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ima",
+                  "local_zip"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Source"
+          },
+          "knowledge_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Snapshot"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status"
+        ],
+        "title": "TaskView",
+        "description": "Preserve existing task properties while publishing the V2 response schema."
+      },
+      "TextField": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "explicit",
+              "inferred",
+              "unknown"
+            ],
+            "title": "Source"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Reason"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "evidence",
+          "reason",
+          "value"
+        ],
+        "title": "TextField"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Versioned": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "Versioned"
+      }
+    }
+  }
+}

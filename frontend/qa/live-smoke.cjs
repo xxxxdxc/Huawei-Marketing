@@ -1,0 +1,30 @@
+// Read-only smoke check against the user's running service. All writes are blocked.
+const { chromium } = require('@playwright/test');
+const fs = require('node:fs');
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.FRONTEND_TEST_BROWSER || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const page = await context.newPage();
+  const errors = [], blockedWrites = [];
+  await page.route('**/api/**', route => { const request = route.request(); if (!['GET', 'HEAD'].includes(request.method())) { blockedWrites.push(request.method() + ' ' + new URL(request.url()).pathname); return route.abort(); } return route.continue(); });
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('http://127.0.0.1:5174/');
+  await page.getByLabel('产品型号', { exact: true }).waitFor({ state: 'visible' });
+  await page.waitForFunction(() => !document.querySelector('select')?.disabled, { timeout: 30000 });
+  const productCount = await page.getByLabel('产品型号', { exact: true }).locator('option').count() - 1;
+  const desktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  await page.screenshot({ path: 'qa/screenshots/live-home-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: '连接设置', exact: true }).click();
+  const keyBlank = await page.getByLabel('API Key', { exact: true }).inputValue() === '';
+  const separateKey = await page.getByLabel('独立核验 API Key（可选）', { exact: true }).count();
+  await page.screenshot({ path: 'qa/screenshots/live-settings-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: '内容工作台', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 900 });
+  const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  await page.screenshot({ path: 'qa/screenshots/live-home-mobile.png', fullPage: true });
+  const result = { readOnly: true, productCount, keyBlank, separateReviewerKeyField: separateKey === 1, desktopOverflow, mobileOverflow, pageErrors: errors, blockedWrites, checkedAt: new Date().toISOString() };
+  fs.writeFileSync('qa/live-smoke.json', JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
+  await browser.close();
+  if (errors.length || blockedWrites.length || desktopOverflow || mobileOverflow || !keyBlank || productCount < 1) process.exitCode = 1;
+})().catch(e => { console.error(e); process.exitCode = 1; });

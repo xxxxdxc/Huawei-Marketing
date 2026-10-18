@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/anthropics/knowledge-work-plugins",
+  "path": "marketing/skills/campaign-plan/SKILL.md",
+  "git_blob_sha": "087001892894890bf7fd84e0c9f999e0a68831ab",
+  "sha256": "f0b146074b64ee0fd52f7864e30191eab83878c8c1e3e7cf24754e13c7dbfad3",
+  "adaptation": "Official source retained verbatim; application-specific stage rules are in backend/brief_adapter.md."
+}
