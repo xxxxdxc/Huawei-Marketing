@@ -1,6 +1,5 @@
 import copy, io, json, os, re, zipfile
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 from typing import Literal
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
@@ -11,6 +10,7 @@ from . import platform_change as pc, evidence_resolution as er
 from .clients import llm, ServiceError, KB_NAME
 from .knowledge import knowledge as ima
 from .settings import ROOT, ASSETS, public_settings, save_settings, get_settings
+from .request_origin import origin_allowed
 
 @asynccontextmanager
 async def lifespan(app):
@@ -26,9 +26,10 @@ app.add_middleware(TrustedHostMiddleware,allowed_hosts=os.getenv("HUAWEI_ALLOWED
 @app.middleware("http")
 async def local_origin(request:Request,call_next):
     origin=request.headers.get("origin")
-    if origin and request.method not in ("GET","HEAD","OPTIONS") and urlparse(origin).netloc!=request.headers.get("host"):
-        return Response("跨站请求已拒绝",status_code=403)
-    response=await call_next(request)
+    if origin is not None and request.method not in ("GET","HEAD","OPTIONS") and not origin_allowed(origin,request.headers.get("host", ""),request.url.scheme):
+        response=Response(json.dumps({"detail":"请求来源与服务配置不匹配，请刷新页面或联系管理员检查部署设置。","code":"origin_not_allowed"},ensure_ascii=False),status_code=403,media_type="application/json")
+    else:
+        response=await call_next(request)
     if request.url.path.startswith("/api/"):response.headers["Cache-Control"]="no-store"
     response.headers["X-Content-Type-Options"]="nosniff"
     return response

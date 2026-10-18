@@ -20,6 +20,7 @@ Dockerfile 使用 Node.js 22 构建前端；Python 3.12 运行后端，并保留
 | HUAWEI_LLM_REVIEWER_API_KEY | 可选独立图片理解与核验凭证；省略时沿用写作密钥 |
 | HUAWEI_LLM_BASE_URL | 可选 HTTPS 模型服务地址，须与密钥配套 |
 | HUAWEI_ALLOWED_HOSTS | 本空间代理会改写 Host，云端设置为 *；本机默认仍限制 localhost 与 127.0.0.1 |
+| HUAWEI_ALLOWED_ORIGINS | 本空间设为 https://xxxxcxc-huawei-marketing.ms.show；多个完整来源用逗号分隔，不支持 * |
 
 魔搭访问令牌用于发布权限，不是模型服务密钥，不应作为上述业务密钥使用。本地 Windows 加密凭证文件不能复制到 Linux 容器。
 
@@ -38,3 +39,9 @@ Dockerfile 使用 Node.js 22 构建前端；Python 3.12 运行后端，并保留
 本次仅验证部署、页面及只读目录；没有创建真实营销任务，没有运行云端生成、人工确认和核验导出的完整业务闭环。当前尚未实现公网访客任务隔离、共享设置保护及调用限额，不能据此视为多租户生产版本。
 
 请从 https://modelscope.cn/studios/Xxxxcxc/Huawei-Marketing 进入；平台嵌入页会携带访问参数，不要把带访问参数的临时页面地址提交到源码。自动化只读检查使用平台返回的 API 专用域名并通过发布令牌认证。
+
+
+## 魔搭提交请求返回403的修复
+魔搭会改写后端收到的 Host，但浏览器的 Origin 仍是应用的 ms.show 域名。仅把 Host 放开不能解决写请求的来源校验。配置 HUAWEI_ALLOWED_ORIGINS 为该应用的完整来源，后端按协议、域名和端口精确匹配；不信任客户端提供的 X-Forwarded-Host，不开放任意跨站写入。未配置时仍沿用本机同源校验。拒绝时返回带 detail 的 JSON，前端可显示具体原因。
+
+新增14项代理与来源校验回归，后端共202项隔离测试通过。真实 iframe 的空请求在修复前返回403；发布后以参数校验结果和本地模型隔离测试共同验证提交链路。
