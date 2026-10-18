@@ -61,3 +61,5 @@ npm --prefix frontend run test:ui
 - 部署说明：`docs/DEPLOYMENT.md`。创建空间或上传源码不等于应用已经成功启动。
 
 不提交 `.local/`、模型凭证、数据库、`.env`、依赖目录或本地知识库 ZIP。第三方素材与产品资料不因本项目源码发布而获得再分发许可；vendor 组件保留其原有授权文件。
+
+项目说明书：[Word 文档](docs/华为PC营销智能体项目说明书.docx)。
