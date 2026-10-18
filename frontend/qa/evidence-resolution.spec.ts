@@ -102,3 +102,28 @@ test('review resolution keyboard accessibility and responsive layout',async({pag
  await page.locator('.evidence-resolution').screenshot({path:'qa/screenshots/evidence-resolution-mobile.png'});
  report=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(report.violations).toEqual([]);
 });
+
+
+test('adjust content button opens read-only preview for checked omissions',async({page})=>{
+ const {local,state}=await setup(page,{ack:true});
+ await page.getByLabel('本次不写这项内容',{exact:true}).check();
+ await page.getByRole('button',{name:'调整内容，继续创作',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'确认本次内容调整'})).toBeVisible();
+ expect(local.calls).toHaveLength(1);
+ expect(local.calls[0].path).toContain('/evidence-resolution/preview');
+ expect(local.calls[0].body).toEqual({version:10,drop_request_ids:['r1'],drop_direction_ids:[]});
+ expect(state.task!.version).toBe(10);
+ await expect(page.getByRole('button',{name:'确认调整，继续规划'})).toBeDisabled();
+ await page.getByLabel('我同意本次放宽此要求：本次不写续航').check();
+ await page.getByRole('button',{name:'确认调整，继续规划'}).click();
+ await expect(page.getByRole('button',{name:'确认规划，开始写稿'})).toBeVisible();
+ expect(local.calls).toHaveLength(2);
+ expect(state.writes.some(w=>w.path.endsWith('/confirm-plan'))).toBeFalsy();
+});
+
+test('adjust content button explains missing selection without sending a request',async({page})=>{
+ const {local}=await setup(page);
+ await page.getByRole('button',{name:'调整内容，继续创作',exact:true}).click();
+ await expect(page.getByRole('alert').filter({hasText:'请先勾选本次不写的内容，再查看取舍影响。'})).toBeVisible();
+ expect(local.calls).toHaveLength(0);
+});

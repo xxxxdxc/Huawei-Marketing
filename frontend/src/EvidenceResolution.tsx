@@ -30,6 +30,14 @@ export default function EvidenceResolution({ task, locked, act, onDirty, onInspe
   const unmet = overview?.unmet_requirements.filter(u => !u.omitted) || [];
   function choose(id:string) { setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids,id]); setPreview(null); setAcks([]); setError(''); }
   function changeMode(next:typeof mode) { if (next === mode) return; if ((instruction.trim() || selected.length || updated) && !window.confirm('切换处理方式会清除尚未提交的选择和输入，继续？')) return; setMode(next); setPreview(null); setAcks([]); setSelected([]); setInstruction(''); setUpdated(false); setModifyConfirmed(false); setError(''); }
+  function activateMode(next:typeof mode) {
+    if (disabled) return;
+    if (next !== 'adjust' || mode !== 'adjust') { changeMode(next); return; }
+    if (!canAdjust) { setError('当前任务不能局部调整，请先返回可继续的步骤。'); return; }
+    if (!selected.length) { setError('请先勾选本次不写的内容，再查看取舍影响。'); return; }
+    if (preview) { previewHeading.current?.focus(); return; }
+    void getPreview();
+  }
   async function getPreview() {
     if (requestLock.current || disabled || !selected.length) return;
     requestLock.current = true; setWorking(true); setPreview(null); setAcks([]); setError('');
@@ -60,7 +68,7 @@ export default function EvidenceResolution({ task, locked, act, onDirty, onInspe
       {unmet.map(u=><article className="unmet-card" key={u.request.id}><h4>{u.request.question}</h4><dl><dt>已找到</dt><dd>{u.found.length ? u.found.map(f=><button className="text-link" key={f.id} onClick={()=>onInspect({type:'fact',id:f.id})}>{f.claim}</button>) : '这项需求尚无可引用的直接依据；其他已找到的产品资料保留在下方。'}</dd><dt>仍缺少</dt><dd>{u.missing}</dd><dt>影响内容</dt><dd>{u.affected_direction_ids.map(directionName).join('；') || '此项相关表述暂不能写入文案'}</dd></dl>{mode === 'adjust' && <label className="resolution-check"><input type="checkbox" checked={selected.includes(u.request.id)} disabled={disabled || !canAdjust || !u.can_drop || !overview.actions.includes('adjust_content')} onChange={()=>choose(u.request.id)} /><span>本次不写这项内容{!u.can_drop && <small>{u.non_waivable_reason || '此项不能局部舍弃，请补充依据或重新描述需求。'}</small>}</span></label>}</article>)}
       {overview.unmet_requirements.some(u=>u.omitted) && <details className="brief-details"><summary>查看已省略但未满足的需求</summary><ul>{overview.unmet_requirements.filter(u=>u.omitted).map(u=><li key={u.request.id}>{u.request.question}：{u.missing}（已省略，不代表有依据）</li>)}</ul></details>}
       <div className="resolution-paths" aria-label="处理方式">
-        {[['adjust','调整内容，继续创作'],['refresh','补充依据，再检查'],['modify','重新描述需求']].map(([id,label])=><button key={id} className={mode===id?'primary':'secondary'} aria-pressed={mode===id} disabled={disabled} onClick={()=>changeMode(id as typeof mode)}>{label}</button>)}
+        {[['adjust','调整内容，继续创作'],['refresh','补充依据，再检查'],['modify','重新描述需求']].map(([id,label])=><button key={id} className={mode===id?'primary':'secondary'} aria-pressed={mode===id} disabled={disabled} onClick={()=>activateMode(id as typeof mode)}>{label}</button>)}
       </div>
       {mode==='adjust' && <div className="resolution-action"><p>勾选本次不写的内容，先查看关联影响，再决定是否继续。原始证据和历史版本会保留。</p><button className="primary" disabled={disabled || !canAdjust || !selected.length} onClick={getPreview}>{working ? '正在获取预览…' : '查看取舍影响'}<ArrowRight size={16} aria-hidden="true" /></button></div>}
       {preview && mode==='adjust' && <section className="resolution-preview"><h3 ref={previewHeading} tabIndex={-1}>确认本次内容调整</h3><h4>不再表达</h4><ul>{preview.removed.map(r=><li key={r.request.id}>{r.request.question}{!preview.selected_request_ids.includes(r.request.id) && <span className="pending-label">关联影响</span>}</li>)}</ul>

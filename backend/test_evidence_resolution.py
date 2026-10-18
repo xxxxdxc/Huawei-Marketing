@@ -55,6 +55,52 @@ class EvidenceResolutionTests(unittest.TestCase):
             self.assertEqual(self.confirm(t,p).status_code,202)
         return db.get(t["id"])
 
+    def grouped_requests(self):
+        t=paused();a=t['brief_analysis']
+        a['retrieval_plan']['facts'].insert(0,dict(id='RID',direction_id='D1',category='product',question='确认产品型号和配置版本',conditions=[],priority='required',guardrail='identity',waivable=False,depends_on=[]))
+        for r in a['retrieval_plan']['facts'][1:]:
+            if r['id'] != 'R3':r['depends_on']=['RID']
+        a['message_strategy']['priorities'].append(dict(id='D4',direction='核实触屏和手写笔的课堂用途',reason='课堂需求',customer_needs=['触屏'],verification='pending'))
+        a['retrieval_plan']['facts'].extend([
+            dict(id='RTOUCH',direction_id='D4',category='product',question='是否配备触控屏及版本限制',conditions=[],priority='required',depends_on=['RID']),
+            dict(id='RPEN',direction_id='D4',category='product',question='是否支持手写笔用于课堂批注',conditions=[],priority='supporting',depends_on=['RTOUCH'])])
+        t['package']['coverage'].extend([
+            dict(request_id='RID',status='supported',fact_ids=['F01'],reason='型号资料已确认'),
+            dict(request_id='RTOUCH',status='supported',fact_ids=['F01'],reason='隔离用有效引用'),
+            dict(request_id='RPEN',status='not_found',fact_ids=[],reason='缺少手写笔依据')])
+        t['brief']=ba.projection(a);t['brief_confirmation']['analysis_hash']=ba.digest(a)
+        return db.save(t,'同方向包含独立请求与身份前置核查')
+
+    def test_omissions_preserve_identity_and_independent_siblings(self):
+        t=self.grouped_requests();original=copy.deepcopy(t)
+        p=self.preview(t,requests=['R1','RPEN','R3'])
+        self.assertTrue(p['can_apply'],p['remaining_blockers'])
+        self.assertEqual(p['omitted_request_ids'],['R1','R3','RPEN'])
+        self.assertEqual({r['request']['id'] for r in p['retained']},{'RID','R2','RTOUCH'})
+        self.assertNotIn('portability',p['prohibited_topics'])
+        self.assertNotIn('non_waivable',{b['code'] for b in p['remaining_blockers']})
+        self.assertEqual(db.get(t['id']),original)
+        view,_=er.project(t,set(p['omitted_request_ids']),set(p['omitted_direction_ids']))
+        d=next(d for d in view['brief_analysis']['message_strategy']['priorities'] if d['id']=='D4')
+        self.assertIn('触控屏',d['direction']);self.assertNotIn('手写笔',d['direction'])
+        with patch.object(w.llm,'complete',AsyncMock(return_value=copy.deepcopy(PLAN))) as model:
+            self.assertEqual(self.confirm(t,p).status_code,202)
+        u=db.get(t['id']);self.assertEqual(u['status'],'plan_ready');self.assertIsNone(u['document'])
+        self.assertEqual(u['brief_analysis'],original['brief_analysis']);self.assertEqual(model.call_count,1)
+
+    def test_shared_direction_does_not_reverse_dependency_edges(self):
+        t=self.grouped_requests();p=self.preview(t,requests=['RPEN'])
+        self.assertNotIn('RTOUCH',p['omitted_request_ids'])
+        self.assertNotIn('RID',p['omitted_request_ids'])
+        p=self.preview(t,requests=['RTOUCH'])
+        self.assertIn('RPEN',p['omitted_request_ids'])
+        self.assertNotIn('RID',p['omitted_request_ids'])
+
+    def test_direct_identity_omission_still_blocks(self):
+        t=self.grouped_requests();p=self.preview(t,requests=['RID'])
+        self.assertFalse(p['can_apply'])
+        self.assertIn('non_waivable',{b['code'] for b in p['remaining_blockers']})
+
     def test_preview_read_only_and_lists_dependency_impact(self):
         t=paused();original=copy.deepcopy(db.get(t["id"]))
         with patch.object(w.llm,"complete",AsyncMock()) as model,patch.object(w.ima,"retrieve_for_task",AsyncMock()) as retrieve:

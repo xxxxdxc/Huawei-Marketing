@@ -13,7 +13,8 @@ TOPICS = {
     "portability": ("轻便/重量", r"轻便|轻薄|便携|重量|机身厚度|携带负担|portability"),
     "compatibility": ("软件/系统兼容", r"兼容|适配|驱动|软件支持|应用支持|compatib"),
     "performance": ("性能", r"性能|处理器|CPU|GPU|跑分|算力|流畅"),
-    "display": ("屏幕", r"屏幕|显示屏|色域|分辨率|OLED|刷新率"),
+    "display": ("屏幕", r"屏幕|显示屏|触控屏|触摸屏|触屏|色域|分辨率|OLED|刷新率"),
+    "stylus": ("手写笔支持", r"手写笔|触控笔|触屏笔|stylus"),
     "price": ("价格", r"价格|售价|报价|到手价|金额|多少钱"),
     "promotion": ("优惠", r"优惠|补贴|折扣|赠品|促销|领券"),
     "safety": ("安全条件", r"电压|安全|禁忌|风险|充电协议"),
@@ -65,36 +66,39 @@ def dependency_closure(t,request_ids,direction_ids):
     by_id={r["id"]:r for r in requests};directions={d["id"]:d for d in a["message_strategy"]["priorities"]}
     if not set(request_ids)<=set(by_id) or not set(direction_ids)<=set(directions):
         raise ValueError("取舍范围包含不存在的请求或方向")
-    omitted=set(request_ids);dropped=set(direction_ids);reasons={}
+    # A direction groups requests; it is not a dependency edge. In particular,
+    # identity checks and independently supported features may share a direction.
+    roots=set(request_ids)|{r["id"] for r in requests if r["direction_id"] in direction_ids}
+    omitted=set(roots);dropped=set(direction_ids);reasons={}
     previous=assert_scope(t) or {}
     omitted.update(previous.get("omitted_request_ids",[]));dropped.update(previous.get("omitted_direction_ids",[]))
     for rid in omitted:reasons[rid]=dict(kind="selected_or_inherited",via=rid)
     cov={c["request_id"]:c for c in t["package"].get("coverage",[])}
-    roots=set(request_ids)|{r["id"] for r in requests if r["direction_id"] in direction_ids}
     seed_sets=[topics(by_id[x]["question"]) for x in roots]
     removed_topics=set().union(*(keys for keys in seed_sets if len(keys)==1)) if seed_sets else set()
     removed_topics.update(previous.get("prohibited_topics",[]))
     changed=True
     while changed:
-        before=(set(omitted),set(dropped))
-        for rid in list(omitted):dropped.add(by_id[rid]["direction_id"])
+        before=set(omitted)
+        lost_facts={fid for drop in omitted if cov.get(drop,{}).get("status")=="conflict" for fid in cov.get(drop,{}).get("fact_ids",[])}
         for r in requests:
             rid=r["id"]
             if rid in omitted:continue
             reason=None
-            if r["direction_id"] in dropped:
-                reason=dict(kind="same_direction",via=r["direction_id"])
-            else:
-                deps=set(r.get("depends_on",[])) & omitted
-                if deps:reason=dict(kind="explicit_dependency",via=sorted(deps))
-                lost_facts={fid for drop in omitted if cov.get(drop,{}).get("status")=="conflict" for fid in cov.get(drop,{}).get("fact_ids",[])}
-                shared=lost_facts & set(cov.get(rid,{}).get("fact_ids",[]))
-                if shared:reason=dict(kind="shared_evidence",via=sorted(shared))
-                own_topics=topics(r["question"]+" "+directions[r["direction_id"]]["direction"])
-                overlap=removed_topics & own_topics
-                if overlap:reason=dict(kind="shared_subject",via=sorted(overlap))
+            deps=set(r.get("depends_on",[])) & omitted
+            if deps:reason=dict(kind="explicit_dependency",via=sorted(deps))
+            shared=lost_facts & set(cov.get(rid,{}).get("fact_ids",[]))
+            if shared:reason=dict(kind="shared_evidence",via=sorted(shared))
+            # Legacy subject fallback uses the request itself, never its parent
+            # heading, and cannot silently remove a mandatory prerequisite.
+            overlap=removed_topics & topics(r["question"])
+            if overlap and not protected_reason(t,r):reason=dict(kind="shared_subject",via=sorted(overlap))
             if reason:omitted.add(rid);reasons[rid]=reason
-        changed=before!=(omitted,dropped)
+        changed=before!=omitted
+    for did in directions:
+        members=[r for r in requests if r["direction_id"]==did]
+        remaining=[r for r in members if r["id"] not in omitted and r.get("guardrail","none")!="identity"]
+        if any(r["id"] in omitted for r in members) and not remaining:dropped.add(did)
     return omitted,dropped,reasons
 
 
@@ -152,6 +156,11 @@ def project(t,omitted,dropped):
     a["retrieval_plan"]["facts"]=retained
     a["retrieval_plan"]["images"]=[r for r in a["retrieval_plan"]["images"] if r["direction_id"] not in dropped]
     a["message_strategy"]["priorities"]=[d for d in a["message_strategy"]["priorities"] if d["id"] not in dropped]
+    for direction in a["message_strategy"]["priorities"]:
+        if any(r["id"] in omitted and r["direction_id"]==direction["id"] for r in requests):
+            kept=[r["question"] for r in retained if r["direction_id"]==direction["id"] and r.get("guardrail","none")!="identity"]
+            direction["direction"]="核实本次保留内容："+"；".join(kept)
+            direction["reason"]="根据用户本次取舍，仅保留独立请求；不恢复已舍弃的延伸用途"
     labels=[d["direction"] for d in a["message_strategy"]["priorities"]]
     a["message_strategy"]["theme"]="围绕本次保留方向创作："+"；".join(labels)
     a["message_strategy"]["angle"]="仅展开本次保留方向，所有客观陈述以允许使用的事实为依据"
@@ -202,7 +211,7 @@ def evaluate(t,omitted,dropped):
     for gap in gaps:blockers.append(dict(code=gap["blocking_reason"],request_id=gap["request"]["id"],reason=gap.get("reason") or gap["coverage"]["reason"],waivable=not bool(protected_reason(t,gap["request"]))))
     if view["package"].get("conflicts"):
         blockers.append(dict(code="active_conflict",reason="保留范围仍存在未解决冲突",waivable=False))
-    product_ids={r["id"] for r in view["brief_analysis"]["retrieval_plan"]["facts"] if ep.request_kind(r)=="product"}
+    product_ids={r["id"] for r in view["brief_analysis"]["retrieval_plan"]["facts"] if ep.request_kind(r)=="product" and r.get("guardrail","none")!="identity"}
     valid_product_facts={f["id"] for f in view["package"]["facts"] if f.get("category","product")=="product" and ep.commercial_kind(f["claim"]+" "+f["quote"]) is None}
     has_product=any(c["request_id"] in product_ids and c["status"]=="supported" and set(c["fact_ids"])&valid_product_facts for c in view["package"]["coverage"])
     if not view["brief_analysis"]["message_strategy"]["priorities"] or not has_product:
@@ -235,9 +244,9 @@ def preview(t,request_ids=(),direction_ids=()):
         omitted_request_ids=sorted(omitted),omitted_direction_ids=sorted(dropped),
         removed=[dict(request=copy.deepcopy(r),coverage=copy.deepcopy(cov.get(r["id"])),dependency=reasons.get(r["id"])) for r in requests if r["id"] in omitted],
         affected_directions=[dict(direction=copy.deepcopy(d),request_ids=[r["id"] for r in requests if r["direction_id"]==d["id"]],
-            selected=d["id"] in direction_ids,reason="直接选择或关联请求/主题/证据依赖") for d in directions if d["id"] in dropped],
+            selected=d["id"] in direction_ids,reason="整个方向已舍弃" if d["id"] in dropped else "仅移除已舍弃请求及其依赖，保留独立依据；当前方向："+next((x["direction"] for x in (view or {}).get("brief_analysis",{}).get("message_strategy",{}).get("priorities",[]) if x["id"]==d["id"]),d["direction"])) for d in directions if d["id"] in dropped or any(r["id"] in omitted and r["direction_id"]==d["id"] for r in requests)],
         retained=[dict(request=copy.deepcopy(r),coverage=copy.deepcopy(cov.get(r["id"]))) for r in requests if r["id"] not in omitted],
-        retained_directions=[copy.deepcopy(d) for d in directions if d["id"] not in dropped],
+        retained_directions=copy.deepcopy(view["brief_analysis"]["message_strategy"]["priorities"]) if view else [],
         retained_fact_ids=[f["id"] for f in view["package"]["facts"]] if view else [],
         excluded_fact_ids=excluded,
         excluded_image_ids=[im["id"] for im in t["package"].get("asset_candidates",t["package"].get("images",[])) if not image_allowed(t,im,prohibited)],
