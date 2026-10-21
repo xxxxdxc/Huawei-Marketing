@@ -10,14 +10,14 @@ export function EvidenceDialog({ task, target, onClose }: { task: Task; target: 
   const pkg = task.package;
   if (!pkg) return null;
   const fact = target.type === 'fact' ? [...pkg.facts, ...(pkg.all_facts || [])].find(f => f.id === target.id) : null;
-  const asset = target.type === 'image' ? pkg.images.find(i => i.id === target.id) : null;
+  const asset = target.type === 'image' ? [...pkg.images, ...(pkg.asset_candidates || [])].find(i => i.id === target.id) : null;
   const source = pkg.sources.find(s => s.id === (fact?.source_id || (target.type === 'source' ? target.id : '')));
   const index = fact && source ? source.text.indexOf(fact.quote) : -1;
   return <Dialog title={fact ? '事实与原文依据' : asset ? '图片来源与适用范围' : '原始资料'} onClose={onClose} wide>
     <p className="muted">当前产品：{pkg.product.name}</p>
     {fact && !pkg.facts.some(f => f.id === fact.id) && <p className="notice warning">此事实仅供追溯，未纳入当前可用内容。</p>}
     {fact && <><h3 className="evidence-title">{fact.claim}</h3><blockquote className="source-quote">{fact.quote}</blockquote><div className="notice">适用条件：{fact.conditions || '该条摘录未另列条件，请结合完整原文审阅。'}</div></>}
-    {asset && <><AssetImage asset={asset} /><h3 className="evidence-title">{asset.description || asset.name}</h3><dl className="detail-list"><dt>型号</dt><dd>{asset.model}</dd><dt>来源</dt><dd>{sourceLabel(asset.source)}</dd><dt>选用理由</dt><dd>{asset.selection_reason || '未提供额外选用说明'}</dd><dt>画面检查</dt><dd>{asset.visual_checked ? '已执行画面检查；整篇仍需完整核验' : '尚未检查实际画面'}</dd></dl></>}
+    {asset && <>{!pkg.images.some(i => i.id === asset.id) && <p className="notice warning">此图片仅供追溯，未纳入当前可用素材。</p>}<AssetImage asset={asset} /><h3 className="evidence-title">{asset.description || asset.name}</h3><dl className="detail-list"><dt>型号</dt><dd>{asset.model}</dd><dt>来源</dt><dd>{sourceLabel(asset.source)}</dd><dt>选用理由</dt><dd>{asset.selection_reason || '未提供额外选用说明'}</dd><dt>画面检查</dt><dd>{asset.visual_checked ? '已执行画面检查；整篇仍需完整核验' : '尚未检查实际画面'}</dd></dl></>}
     {source && <><h3 className="evidence-title">{source.title}</h3><p className="source-path">{sourceLabel(source.path)}</p><p className="muted">读取时间：{localTime(source.retrieved_at)}</p><div className="source-text" tabIndex={0} aria-label="完整原文">{index >= 0 && fact ? <>{source.text.slice(0, index)}<mark>{fact.quote}</mark>{source.text.slice(index + fact.quote.length)}</> : source.text}</div>{fact && index < 0 && <p className="muted">未找到完全相同的连续摘录，请对照原文检查空格、断行与内容。</p>}</>}
     {!fact && !asset && !source && <p className="notice">该项依据在当前版本中不存在，请重新载入任务。</p>}
   </Dialog>;

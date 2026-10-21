@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later; adapted Huawei-Marketing layout preview -->
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>公众号排版预览</title>
+<style nonce="__NONCE__">
+*{box-sizing:border-box}body{margin:0;background:#f4f6f5;color:#20242c;font:16px/1.65 -apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif}main{max-width:1040px;margin:0 auto;padding:28px 20px}h1{font-size:24px;margin:0 0 8px}p{overflow-wrap:anywhere}.intro{color:#52615a;margin:0 0 22px}.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:white;border:1px solid #dbe5df;border-radius:12px;padding:16px}.toolbar a,button,select{font:inherit;min-height:44px;padding:9px 14px;border:1px solid #c6d4cc;border-radius:8px;background:white;color:#203c2e;text-decoration:none;cursor:pointer}button.primary{background:#146344;color:white;border-color:#146344}button:disabled{opacity:.55;cursor:wait}a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid #508e74;outline-offset:3px}label{display:flex;gap:8px;align-items:center}.notice{font-size:14px;color:#52615a}#status{min-height:28px;font-weight:600;color:#146344}#status.error{color:#9c3323}.paper{max-width:717px;background:white;border:1px solid #e0e6e2;border-radius:12px;margin:24px auto 0;padding:24px 20px}.title-label{font-size:12px;color:#52615a;margin:0}.article-title{font-size:24px;line-height:1.5;overflow-wrap:anywhere;margin:6px 0 24px}#article{overflow-wrap:anywhere}#article section,#article p{max-width:100%}#article img{max-width:100%}footer{font-size:13px;text-align:center;color:#52615a;margin-top:24px}footer a{color:#146344}.manual{display:none}#manual.show{display:inline-block}.snapshot{font-size:13px;color:#52615a;margin-top:8px}#warning{white-space:pre-line}@media(max-width:520px){main{padding:20px 12px}.paper{padding:20px 12px}.toolbar>*{flex:1 1 auto}.toolbar label{flex-basis:100%}.toolbar select{flex:1}h1{font-size:22px}}
+</style></head><body><main>
+<h1>公众号排版预览</h1>
+<p class="intro">产品图文 · 标题与正文分别复制，再粘贴到公众号编辑器。</p>
+<div class="toolbar" aria-label="排版与导出操作">
+<label id="theme-label">排版主题<select id="theme"><option value="moyu-green">摸鱼绿</option><option value="moyu-ticket">摸鱼票据</option></select></label>
+<button id="copy-title">复制标题</button><button id="copy" class="primary">复制公众号排版</button>
+<a id="download-html">下载 HTML</a><a id="download-bundle">下载顺序图片包</a>
+<button id="manual" class="manual">选择正文，手动复制</button>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+<p id="warning" class="notice"></p><p id="snapshot" class="snapshot"></p>
+<article class="paper" aria-label="公众号排版效果">
+<p class="title-label">公众号标题（单独填写，不在正文复制范围内）</p>
+<h2 id="article-title" class="article-title"></h2>
+<section id="article" aria-label="公众号正文"></section>
+</article>
+<footer>排版组件：gzh-design-skill · AGPL-3.0-or-later · <a id="source" href="/api/wechat/layout-source">排版组件源码与许可证</a></footer>
+</main>
+<script nonce="__NONCE__">
+const data=__CONFIG__;
+const byId=id=>document.getElementById(id);
+const params=new URLSearchParams({version:String(data.version),theme:data.theme});
+const base="/api/tasks/"+encodeURIComponent(data.task_id)+"/wechat/";
+byId("theme").value=data.theme;byId("article-title").textContent=data.title;byId("article").innerHTML=data.html;
+byId("warning").textContent=data.warnings.join("\n");
+byId("snapshot").textContent=(data.offline?"导出时已核验快照":"已核验版本")+" V"+data.version+" · 指纹 "+data.document_hash.slice(0,12);
+if(data.offline){
+ byId("theme-label").hidden=true;byId("download-bundle").hidden=true;byId("source").hidden=true;
+ byId("download-html").href="article.html";byId("download-html").download="article.html";
+}else{
+ byId("download-html").href=base+"export?"+params;
+ byId("download-bundle").href=base+"export?"+params+"&bundle=true";
+ byId("theme").addEventListener("change",()=>{params.set("theme",byId("theme").value);location.href=base+"preview?"+params;});
+}
+function status(message,error=false){byId("status").textContent=message;byId("status").className=error?"error":"";}
+async function current(){
+ if(data.offline)return data;
+ const response=await fetch(base+"render?"+params,{cache:"no-store"});
+ if(!response.ok){const body=await response.json().catch(()=>null);throw Error(typeof body?.detail==="string"?body.detail:"无法校验当前稿件，请回工作台检查。");}
+ const fresh=await response.json();
+ if(fresh.document_hash!==data.document_hash)throw Error("稿件已更新，请返回工作台重新打开排版预览。");
+ return fresh;
+}
+function absoluteHtml(html){
+ const container=document.createElement("section");container.innerHTML=html;
+ container.querySelectorAll("img").forEach(img=>img.setAttribute("src",img.src));
+ return container.innerHTML;
+}
+byId("copy-title").onclick=async()=>{
+ const button=byId("copy-title");button.disabled=true;
+ try{const fresh=await current();await navigator.clipboard.writeText(fresh.title);status("标题已复制，请粘贴到公众号标题栏。");}
+ catch(error){status(error.message||"标题复制未完成，请手动选择标题复制。",true);}
+ finally{button.disabled=false;}
+};
+byId("copy").onclick=async()=>{
+ const button=byId("copy");button.disabled=true;byId("manual").classList.remove("show");status("正在检查版本并复制排版…");
+ try{
+  const checked=current();
+  if(navigator.clipboard?.write&&typeof ClipboardItem!=="undefined"){
+   await navigator.clipboard.write([new ClipboardItem({
+    "text/html":checked.then(fresh=>new Blob([absoluteHtml(fresh.html)],{type:"text/html"})),
+    "text/plain":checked.then(fresh=>new Blob([fresh.plain_text],{type:"text/plain"}))
+   })]);
+  }else{
+   await checked;
+   const range=document.createRange();range.selectNodeContents(byId("article"));
+   const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+   if(!document.execCommand("copy"))throw Error("浏览器未允许富文本复制，请点击“选择正文，手动复制”后按 Ctrl+C。");
+   selection.removeAllRanges();
+  }
+  status("正文排版已复制。粘贴后请检查图片；缺图时按图片包顺序补插。");
+ }catch(error){status(error.message||"富文本复制未完成，请选择正文手动复制。",true);byId("manual").classList.add("show");}
+ finally{button.disabled=false;}
+};
+byId("manual").onclick=async()=>{
+ try{await current();const range=document.createRange();range.selectNodeContents(byId("article"));const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);status("已选择正文，请按 Ctrl+C，再到公众号正文编辑器粘贴。");}
+ catch(error){status(error.message,true);}
+};
+byId("article").addEventListener("error",event=>{if(event.target.tagName==="IMG")status("部分图片未加载，请下载顺序图片包补插。",true);},true);
+</script></body></html>

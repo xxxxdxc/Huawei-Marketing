@@ -1,11 +1,14 @@
 import asyncio, base64, csv, hashlib, io, json, os, re, time
 from pathlib import Path
+from contextvars import ContextVar
 from urllib.parse import urlparse
 import httpx
 from PIL import Image
 from pydantic import ValidationError
 from . import storage as db, model_output as mo
 from .settings import ROOT, ASSETS, DATA, get_settings, api_key, user_env
+
+usage_capture=ContextVar("planner_model_usage",default=None)
 
 KB_NAME = "任德耀新建华为PC知识库"
 SCRIPT = ROOT / "backend/vendor/ima-skill/ima_api.cjs"
@@ -205,9 +208,23 @@ class LLM:
         attempts=[]
         async with httpx.AsyncClient(timeout=150,trust_env=False) as c:
             for attempt in range(2):
+                started=time.perf_counter()
                 try:res=await c.post(s["base_url"].rstrip("/")+"/chat/completions",headers={"Authorization":"Bearer "+key},json=body)
-                except httpx.TimeoutException:raise ServiceError("模型响应超时，请保留当前任务后重试")
-                except httpx.HTTPError:raise ServiceError("无法连接模型服务，请检查 API 地址和网络")
+                except httpx.TimeoutException:
+                    if usage_capture.get() is not None:usage_capture.get().append(dict(model=model,schema=schema.__name__,attempt=attempt+1,error='timeout',elapsed_seconds=time.perf_counter()-started))
+                    raise ServiceError("模型响应超时，请保留当前任务后重试")
+                except httpx.HTTPError:
+                    if usage_capture.get() is not None:usage_capture.get().append(dict(model=model,schema=schema.__name__,attempt=attempt+1,error='network',elapsed_seconds=time.perf_counter()-started))
+                    raise ServiceError("无法连接模型服务，请检查 API 地址和网络")
+                capture=usage_capture.get()
+                if capture is not None:
+                    record=dict(model=model,schema=schema.__name__,attempt=attempt+1,http_status=res.status_code,elapsed_seconds=time.perf_counter()-started,max_tokens=body['max_tokens'])
+                    try:
+                        envelope=res.json();usage=envelope.get('usage',{})
+                        record['usage']={k:v for k,v in usage.items() if k in ('prompt_tokens','completion_tokens','total_tokens','input_tokens','output_tokens') and type(v) is int}
+                        record['response_model']=envelope.get('model')
+                    except (ValueError,AttributeError):pass
+                    capture.append(record)
                 if res.status_code!=200:
                     try:
                         provider_error=res.json().get("error",{})

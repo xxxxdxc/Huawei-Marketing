@@ -1,0 +1,63 @@
+// Real local-browser HTML/clipboard smoke; synthetic fixture, never WeChat account writes.
+const fs=require('node:fs');
+const path=require('node:path');
+const {chromium}=require('@playwright/test');
+const AxeBuilder=require('@axe-core/playwright').default;
+(async()=>{
+ const root=path.resolve(__dirname,'../..'),qa=path.join(root,'.local/wechat-layout-qa');
+ const info=JSON.parse(fs.readFileSync(path.join(qa,'fixture.json'),'utf8'));
+ const browser=await chromium.launch({executablePath:process.env.FRONTEND_TEST_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+ const context=await browser.newContext({viewport:{width:1440,height:1100},permissions:['clipboard-read','clipboard-write']});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ const results=[];
+ const check=(name,condition,detail)=>{results.push({name,passed:!!condition,detail});if(!condition)throw Error(name+': '+JSON.stringify(detail));};
+ try{
+  await page.goto(info.preview);await page.locator('#article img').last().waitFor();
+  await page.waitForFunction(()=>[...document.querySelectorAll('#article img')].every(im=>im.complete&&im.naturalWidth>0));
+  check('preview has two verified fixture images',await page.locator('#article img').count()===2);
+  check('internal headings absent',!(await page.locator('#article').innerText()).includes('INTERNAL_STAFF'));
+  check('title kept outside copied body',!(await page.locator('#article').innerText()).includes(await page.locator('#article-title').innerText()));
+  await page.getByRole('button',{name:'复制公众号排版',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('status').textContent.includes('正文排版已复制'));
+  const copied=await page.evaluate(async()=>{const item=(await navigator.clipboard.read())[0];return {types:item.types,html:await(await item.getType('text/html')).text(),plain:await(await item.getType('text/plain')).text()};});
+  check('clipboard contains HTML and plain text',copied.types.includes('text/html')&&copied.types.includes('text/plain'),copied.types);
+  check('clipboard retains inline styles and absolute image sources',copied.html.includes('style=')&&copied.html.includes('http://127.0.0.1:8767/api/assets/'));
+  check('clipboard excludes controls and title',!copied.html.includes('复制公众号排版')&&!copied.html.includes('INTERNAL_STAFF')&&!copied.html.includes('轻装出发，留一点从容给工作日'));
+  await page.evaluate(()=>{const field=document.createElement('div');field.id='paste-target';field.contentEditable='true';field.setAttribute('aria-label','隔离粘贴测试区');field.style.cssText='min-height:44px;background:white';document.body.append(field);});
+  await page.locator('#paste-target').focus();await page.keyboard.press('Control+V');
+  await page.waitForFunction(()=>document.getElementById('paste-target').querySelectorAll('img').length===2);
+  check('native paste into isolated contenteditable retains both images',await page.locator('#paste-target img').count()===2);
+  check('native paste retains body text', (await page.locator('#paste-target').innerText()).includes('1.31 kg'));
+  await page.locator('#paste-target').evaluate(el=>el.remove());
+  await page.getByRole('button',{name:'复制标题',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('status').textContent.includes('标题已复制'));
+  check('title copied separately',await page.evaluate(()=>navigator.clipboard.readText())==='轻装出发，留一点从容给工作日');
+  const download=page.waitForEvent('download');await page.getByRole('link',{name:'下载顺序图片包',exact:true}).click();const file=await download;await file.saveAs(path.join(qa,'fixture-wechat-bundle.zip'));
+  check('ordered-image bundle downloaded',fs.statSync(path.join(qa,'fixture-wechat-bundle.zip')).size>1000);
+  let axe=await new AxeBuilder({page}).analyze();check('desktop preview accessibility',axe.violations.length===0,axe.violations.map(x=>({id:x.id,nodes:x.nodes.length})));
+  await page.screenshot({path:path.join(qa,'green-desktop.png'),fullPage:true});
+  await page.locator('#theme').selectOption('moyu-ticket');await page.waitForURL('**theme=moyu-ticket');
+  await page.waitForFunction(()=>[...document.querySelectorAll('#article img')].every(im=>im.complete&&im.naturalWidth>0));
+  check('ticket theme renders original content',(await page.locator('#article').innerText()).includes('1.31 kg'));
+  check('ticket has no score or label',!((await page.locator('#article').innerText()).match(/GRADE|★★★★★|TOOL|STEP/)));
+  await page.screenshot({path:path.join(qa,'ticket-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  check('390px has no horizontal overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+  axe=await new AxeBuilder({page}).analyze();check('mobile preview accessibility',axe.violations.length===0,axe.violations.map(x=>({id:x.id,nodes:x.nodes.length})));
+  await page.screenshot({path:path.join(qa,'ticket-mobile.png'),fullPage:true});
+  await page.evaluate(()=>{navigator.clipboard.write=async()=>{throw Error('隔离模拟：浏览器拒绝剪贴板');};});
+  await page.getByRole('button',{name:'复制公众号排版',exact:true}).click();
+  await page.getByRole('button',{name:'选择正文，手动复制',exact:true}).waitFor();
+  check('clipboard denial gives recovery and no success',!(await page.locator('#status').innerText()).includes('已复制'));
+  await page.route('**/wechat/render?**',route=>route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({detail:'任务已更新，请重新打开排版'})}));
+  await page.getByRole('button',{name:'选择正文，手动复制',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('status').textContent.includes('任务已更新'));
+  check('stale snapshot blocks manual copy action',(await page.locator('#status').innerText()).includes('任务已更新'));
+  check('no JavaScript page errors',errors.length===0,errors);
+ }finally{
+  fs.writeFileSync(path.join(qa,'browser-results.json'),JSON.stringify({results,errors,scope:'Local Edge, synthetic fixture. No WeChat backend paste validation.'},null,2));
+  await browser.close();
+ }
+ console.log(JSON.stringify({checks:results.length,passed:results.filter(r=>r.passed).length,qa},null,2));
+})().catch(error=>{console.error(error);process.exitCode=1;});

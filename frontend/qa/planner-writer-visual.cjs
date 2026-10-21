@@ -1,0 +1,28 @@
+const { chromium } = require('@playwright/test');
+(async () => {
+ const browser = await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+ const page = await browser.newPage({viewport:{width:1440,height:1050}});
+ let writes=0; const errors=[];
+ page.on('request',r=>{if(r.url().includes('/api/') && r.method()!=='GET') writes++;});
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174/?preview=planner-v3');
+ await page.locator('.planner-selection-actions').screenshot({path:'qa/screenshots/planner-v3-actions-desktop.png'});
+ await page.setViewportSize({width:390,height:1050});
+ await page.locator('.planner-confirm-bar').scrollIntoViewIfNeeded();
+ await page.screenshot({path:'qa/screenshots/planner-v3-actions-mobile.png'});
+ await page.getByRole('button',{name:'确认卖点，开始写稿',exact:true}).click();
+ await page.getByLabel('标题',{exact:true}).waitFor();
+ await page.locator('.section-heading').scrollIntoViewIfNeeded();
+ await page.screenshot({path:'qa/screenshots/planner-v3-draft-mobile.png'});
+ await page.getByRole('button',{name:'预览与核验',exact:true}).click();
+ await page.locator('.preview-column').scrollIntoViewIfNeeded();
+ await page.screenshot({path:'qa/screenshots/planner-v3-preview-mobile.png'});
+ await page.setViewportSize({width:1440,height:1050});
+ await page.locator('.creation-grid').scrollIntoViewIfNeeded();
+ await page.screenshot({path:'qa/screenshots/planner-v3-editor-desktop.png'});
+ await page.getByText('查看自动编排记录',{exact:true}).click();
+ await page.locator('.writer-structure').screenshot({path:'qa/screenshots/planner-v3-structure-desktop.png'});
+ if(writes || errors.length) throw new Error(JSON.stringify({writes,errors}));
+ console.log(JSON.stringify({writes,errors}));
+ await browser.close();
+})().catch(e=>{console.error(e);process.exitCode=1;});

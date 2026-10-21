@@ -33,6 +33,18 @@ def apply(task, platform, instruction=None):
         raise ValueError("请先完成并确认 Brief，再使用仅切换平台")
     if platform == task["platform"]:
         raise ValueError("目标平台与当前平台相同")
+    from . import content_planner as cp,platform_writer as pw
+    old_plan=task.get('plan') or {}
+    candidates=(old_plan.get('planning_analysis') or {}).get('candidates')
+    if candidates and old_plan.get('selected_point_ids'):
+        # Snapshot before clearing current structure; only server-stored provenance travels.
+        chosen=set(old_plan['selected_point_ids'])
+        fids={fid for c in candidates if c['id'] in chosen for fid in c['fact_ids']}
+        task['platform_selection']=dict(plan=copy.deepcopy(old_plan),
+            confirmed=pw.confirmed(task) or (old_plan.get('schema_version')=='2' and bool(task.get('document'))),
+            facts=[copy.deepcopy(f) for f in task['package']['facts'] if f['id'] in fids])
+    else:task['platform_selection']=None
+    task['writer_outline']=None;task['writer_stage']=None;task['selection_confirmation']=None
     old_platform = task["platform"]
     original_confirmation = copy.deepcopy(task["brief_confirmation"])
     original_hash = ba.digest(task["brief_analysis"])

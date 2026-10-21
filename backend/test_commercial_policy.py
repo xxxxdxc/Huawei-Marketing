@@ -4,7 +4,8 @@ import copy
 import csv
 import io
 import unittest
-from unittest.mock import AsyncMock,patch
+from unittest.mock import patch
+from backend.planner_test_data import AsyncMock
 from backend.test_brief_agent import BriefAgentTests, PRODUCTS
 from backend.test_workflow import prepared, PLAN
 from backend.brief_test_data import parsing,responses,STRATEGY

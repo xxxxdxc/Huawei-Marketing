@@ -90,7 +90,7 @@ test('whole requirement change has clear reset and returns to strategy confirmat
 test('overview failure is retriable without authorizing mutation',async({page})=>{
  const task=makeV2Task(true);task.status='needs_review';task.package=makeTask('plan_ready').package;task.package!.coverage=[];
  await mockApi(page,task);let fails=true;await page.route('**/evidence-review',r=>r.fulfill({status:fails?503:200,contentType:'application/json',body:JSON.stringify(fails?{detail:'服务暂不可用'}:{version:10,knowledge_source:'ima',unmet_requirements:[],available_facts:[],blockers:[],material_requirements:[],actions:[]})}));await page.goto('/');
- await expect(page.getByText('服务暂不可用')).toBeVisible();fails=false;await page.getByRole('button',{name:'重新读取审查结果'}).click();await expect(page.getByText('没有未处理的缺证需求。其他门槛请查看上方说明。')).toBeVisible();
+ await expect(page.getByText('服务暂不可用')).toBeVisible();fails=false;await page.getByRole('button',{name:'重新读取审查结果'}).click();await expect(page.getByText('当前没有可调整的缺证项，请按上方门槛补充依据或重新描述需求。')).toBeVisible();
 });
 
 test('review resolution keyboard accessibility and responsive layout',async({page})=>{

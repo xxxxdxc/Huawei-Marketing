@@ -1,5 +1,6 @@
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .planner_schemas import ImagePosition, Narrative
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -29,6 +30,11 @@ class Facts(Strict):
     conflicts: list[str]
 
 class PlanSection(Strict):
+    reader_question: str | None = None
+    role: Literal["opening","argument","objection","summary","cta"] | None = None
+    point_ids: list[str] | None = None
+    image_position: ImagePosition | None = None
+    target_chars: int | None = Field(default=None, ge=1, le=900)
     id: str
     heading: str = Field(min_length=1)
     purpose: str = Field(min_length=1)
@@ -37,9 +43,29 @@ class PlanSection(Strict):
     image_reason: str
 
 class Plan(Strict):
+    schema_version: Literal["2", "3"] | None = None
+    product_id: str | None = None
+    phase: Literal["selection", "composed"] | None = None
+    narrative: Narrative | None = None
+    composition_rationale: str | None = Field(default=None, min_length=1, max_length=1000)
+    selected_point_ids: list[str] | None = None
+    planning_analysis: dict | None = None
     angle: str = Field(min_length=1)
     title_direction: str
-    sections: list[PlanSection] = Field(min_length=1, max_length=8)
+    sections: list[PlanSection] = Field(max_length=8)
+
+    @model_validator(mode="after")
+    def phase_contract(self):
+        if self.schema_version == "3":
+            if self.phase not in ("selection", "composed"):
+                raise ValueError("新版规划必须注明阶段")
+            if self.phase == "selection" and self.sections:
+                raise ValueError("卖点选择阶段不安排段落")
+            if self.phase == "composed" and not self.sections:
+                raise ValueError("Writer 结构规划不能为空")
+        elif not self.sections:
+            raise ValueError("旧版规划段落不能为空")
+        return self
     cta: str
 
 class Paragraph(Strict):
@@ -57,7 +83,32 @@ class Document(Strict):
     cta: str
     tags: list[str]
 
+class ScopeEvidence(Strict):
+    topic: str = Field(min_length=1, max_length=100)
+    request_ids: list[str] = Field(max_length=8)
+    direction_ids: list[str] = Field(max_length=5)
+    field: Literal["title", "lead", "paragraph", "caption", "image", "cta", "tags"]
+    section_id: str | None
+    image_id: str | None
+    quote: str = Field(min_length=1, max_length=1000)
+
+class RepairRoot(Strict):
+    title: str | None = None
+    lead: str | None = None
+    cta: str | None = None
+    tags: list[str] | None = None
+
+class RepairParagraph(Strict):
+    section_id: str = Field(min_length=1)
+    text: str | None = None
+    caption: str | None = None
+
+class TextRepair(Strict):
+    root_changes: RepairRoot
+    paragraph_changes: list[RepairParagraph] = Field(max_length=8)
+
 class Issue(Strict):
+    scope_evidence: ScopeEvidence | None = None
     category: Literal["fact","image","compliance","platform","evidence"]
     location: str
     detail: str
@@ -83,6 +134,17 @@ class BriefUpdate(Versioned):
 
 class PlanUpdate(Versioned):
     plan: Plan
+
+class ReplanPoints(Versioned):
+    selected_point_ids: list[str] = Field(min_length=1, max_length=8)
+    replace_current_plan: Literal[True]
+
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_replacement(cls, value):
+        if not isinstance(value, dict) or value.get("replace_current_plan") is not True:
+            raise ValueError("请明确确认替换当前大纲")
+        return value
 
 class DocumentUpdate(Versioned):
     document: Document

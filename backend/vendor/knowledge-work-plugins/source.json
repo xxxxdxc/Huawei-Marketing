@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/anthropics/knowledge-work-plugins",
+  "commit": "bc8f6922cfeea215a202cdcc9f0d299a990889a8",
+  "files": [
+    "marketing/skills/content-creation/SKILL.md",
+    "LICENSE"
+  ],
+  "license": "Apache-2.0"
+}

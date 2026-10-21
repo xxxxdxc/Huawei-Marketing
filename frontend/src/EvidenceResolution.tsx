@@ -3,7 +3,7 @@ import { AlertCircle, ArrowRight, FileSearch, LoaderCircle, RefreshCw } from 'lu
 import type { Task } from './types';
 import type { ResolutionPreview, ReviewOverview } from './evidenceResolutionTypes';
 import type { EvidenceTarget } from './Evidence';
-import { api, ApiError, effectiveStatus, errorMessage, Field, type Act } from './shared';
+import { api, ApiError, canResumePlan, effectiveStatus, errorMessage, Field, type Act } from './shared';
 
 type Props = {task:Task;locked:boolean;act:Act;onDirty:(value:boolean)=>void;onInspect:(target:EvidenceTarget)=>void;onReload:()=>void};
 export default function EvidenceResolution({ task, locked, act, onDirty, onInspect, onReload }: Props) {
@@ -28,10 +28,12 @@ export default function EvidenceResolution({ task, locked, act, onDirty, onInspe
   const canAdjust = ['needs_review','plan_ready'].includes(effectiveStatus(task)) && !task.document;
   const blockers = overview?.blockers || [];
   const unmet = overview?.unmet_requirements.filter(u => !u.omitted) || [];
+  const readyToResume = Boolean(overview && canResumePlan(task) && !blockers.length && !unmet.length && overview.available_facts.length);
   function choose(id:string) { setSelected(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids,id]); setPreview(null); setAcks([]); setError(''); }
   function changeMode(next:typeof mode) { if (next === mode) return; if ((instruction.trim() || selected.length || updated) && !window.confirm('切换处理方式会清除尚未提交的选择和输入，继续？')) return; setMode(next); setPreview(null); setAcks([]); setSelected([]); setInstruction(''); setUpdated(false); setModifyConfirmed(false); setError(''); }
   function activateMode(next:typeof mode) {
     if (disabled) return;
+    if (next === 'adjust' && readyToResume) { changeMode(next); return; }
     if (next !== 'adjust' || mode !== 'adjust') { changeMode(next); return; }
     if (!canAdjust) { setError('当前任务不能局部调整，请先返回可继续的步骤。'); return; }
     if (!selected.length) { setError('请先勾选本次不写的内容，再查看取舍影响。'); return; }
@@ -59,18 +61,20 @@ export default function EvidenceResolution({ task, locked, act, onDirty, onInspe
   const factName = (id:string) => overview?.available_facts.find(f => f.id === id)?.claim || task.package?.all_facts?.find(f => f.id === id)?.claim || task.package?.facts.find(f => f.id === id)?.claim || id;
   if (loading) return <div className="notice" role="status"><LoaderCircle size={18} className="spin" aria-hidden="true" /> 正在整理未满足的需求与可用处理方式…</div>;
   return <section className="evidence-resolution" aria-label="资料检查结果与下一步">
-    <header className="resolution-heading"><span className="resolution-symbol"><FileSearch size={23} aria-hidden="true" /></span><div><h2>{blockers.length ? '先处理这些缺口，再继续规划' : unmet.length ? '部分需求尚无依据，可以调整内容' : '资料检查结果与下一步'}</h2><p>{blockers.length ? `${blockers.length} 项门槛尚未满足。已找到的资料会保留，请选择下方的处理方式。` : '检索结果与内容取舍分开记录；找到依据不等于成稿已核验。'}</p></div></header>
+    <header className="resolution-heading"><span className="resolution-symbol"><FileSearch size={23} aria-hidden="true" /></span><div><h2>{readyToResume ? '资料缺口已处理，可以重新生成卖点建议' : blockers.length ? '先处理这些缺口，再继续规划' : unmet.length ? '部分需求尚无依据，可以调整内容' : '资料检查结果与下一步'}</h2><p>{readyToResume ? '当前没有未处理的资料门槛；卖点建议尚未生成成功，已有资料与取舍记录均已保留。' : blockers.length ? `${blockers.length} 项门槛尚未满足。已找到的资料会保留，请选择下方的处理方式。` : '检索结果与内容取舍分开记录；找到依据不等于成稿已核验。'}</p></div></header>
     {error && <div className="notice warning" role="alert"><p>{error}</p>{stale ? <button className="text-link" onClick={onReload}>重新载入最新版本</button> : !overview ? <button className="text-link" disabled={locked} onClick={() => setRetry(v=>v+1)}>重新读取审查结果</button> : null}</div>}
     {overview && <>
+      {mode==='adjust' && readyToResume && <section className="resolution-preview planning-recovery" aria-label="恢复卖点规划"><h3>接下来：重新生成卖点建议</h3><p>当前尚未生成可确认的卖点建议。可以复用当前资料，重新检查并生成建议。</p><p>已确认的省略内容会保留，不会重新写入。</p><p>本次只恢复规划；如再次发现资料门槛会暂停，成功后仍需你确认核心卖点，才会开始写稿。</p><button className="primary" disabled={disabled} onClick={()=>perform('/resume-plan',{version:task.version})}><RefreshCw size={16} aria-hidden="true" />{working ? '正在提交…' : '重新生成卖点建议'}</button></section>}
       {blockers.length > 0 && <div className="resolution-blockers" role="status"><strong>为什么暂停</strong><ul>{blockers.map((b,i)=><li key={`${b.code}-${i}`}>{b.reason}{!b.waivable && <span className="pending-label">不能直接跳过</span>}</li>)}</ul></div>}
-      <h3>尚未满足的需求</h3>
-      {!unmet.length && <p className="muted">没有未处理的缺证需求。其他门槛请查看上方说明。</p>}
+      {!readyToResume && <h3>尚未满足的需求</h3>}
+      {!unmet.length && !readyToResume && <p className="muted">{readyToResume ? '无需再次勾选已省略的内容。请使用下方的恢复操作。' : '当前没有可调整的缺证项，请按上方门槛补充依据或重新描述需求。'}</p>}
       {unmet.map(u=><article className="unmet-card" key={u.request.id}><h4>{u.request.question}</h4><dl><dt>已找到</dt><dd>{u.found.length ? u.found.map(f=><button className="text-link" key={f.id} onClick={()=>onInspect({type:'fact',id:f.id})}>{f.claim}</button>) : '这项需求尚无可引用的直接依据；其他已找到的产品资料保留在下方。'}</dd><dt>仍缺少</dt><dd>{u.missing}</dd><dt>影响内容</dt><dd>{u.affected_direction_ids.map(directionName).join('；') || '此项相关表述暂不能写入文案'}</dd></dl>{mode === 'adjust' && <label className="resolution-check"><input type="checkbox" checked={selected.includes(u.request.id)} disabled={disabled || !canAdjust || !u.can_drop || !overview.actions.includes('adjust_content')} onChange={()=>choose(u.request.id)} /><span>本次不写这项内容{!u.can_drop && <small>{u.non_waivable_reason || '此项不能局部舍弃，请补充依据或重新描述需求。'}</small>}</span></label>}</article>)}
       {overview.unmet_requirements.some(u=>u.omitted) && <details className="brief-details"><summary>查看已省略但未满足的需求</summary><ul>{overview.unmet_requirements.filter(u=>u.omitted).map(u=><li key={u.request.id}>{u.request.question}：{u.missing}（已省略，不代表有依据）</li>)}</ul></details>}
       <div className="resolution-paths" aria-label="处理方式">
-        {[['adjust','调整内容，继续创作'],['refresh','补充依据，再检查'],['modify','重新描述需求']].map(([id,label])=><button key={id} className={mode===id?'primary':'secondary'} aria-pressed={mode===id} disabled={disabled} onClick={()=>activateMode(id as typeof mode)}>{label}</button>)}
+        {[['adjust',readyToResume ? '返回继续规划' : '调整内容，继续创作'],['refresh','补充依据，再检查'],['modify','重新描述需求']].filter(([id])=>id!=='adjust'||(readyToResume ? mode!=='adjust' : unmet.length>0)).map(([id,label])=><button key={id} className={mode===id?'primary':'secondary'} aria-pressed={mode===id} disabled={disabled} onClick={()=>activateMode(id as typeof mode)}>{label}</button>)}
       </div>
-      {mode==='adjust' && <div className="resolution-action"><p>勾选本次不写的内容，先查看关联影响，再决定是否继续。原始证据和历史版本会保留。</p><button className="primary" disabled={disabled || !canAdjust || !selected.length} onClick={getPreview}>{working ? '正在获取预览…' : '查看取舍影响'}<ArrowRight size={16} aria-hidden="true" /></button></div>}
+
+      {mode==='adjust' && unmet.length>0 && <div className="resolution-action"><p>勾选本次不写的内容，先查看关联影响，再决定是否继续。原始证据和历史版本会保留。</p><button className="primary" disabled={disabled || !canAdjust || !selected.length} onClick={getPreview}>{working ? '正在获取预览…' : '查看取舍影响'}<ArrowRight size={16} aria-hidden="true" /></button></div>}
       {preview && mode==='adjust' && <section className="resolution-preview"><h3 ref={previewHeading} tabIndex={-1}>确认本次内容调整</h3><h4>不再表达</h4><ul>{preview.removed.map(r=><li key={r.request.id}>{r.request.question}{!preview.selected_request_ids.includes(r.request.id) && <span className="pending-label">关联影响</span>}</li>)}</ul>
         {preview.affected_directions.length > 0 && <><h4>受影响的方向</h4><ul>{preview.affected_directions.map(d=><li key={d.direction.id}>{d.direction.direction}<p className="muted">{d.reason}</p></li>)}</ul></>}
         <h4>仍然保留</h4><ul>{preview.retained.map(r=><li key={r.request.id}>{r.request.question}</li>)}</ul>{!preview.retained.length && <p>没有剩余内容方向，不能继续生成。</p>}

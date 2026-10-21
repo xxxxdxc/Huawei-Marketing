@@ -6,7 +6,8 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import AsyncMock,patch
+from unittest.mock import patch
+from backend.planner_test_data import AsyncMock
 from fastapi.testclient import TestClient
 from backend.test_platform_change import task
 from backend.test_workflow import PLAN,DOC
@@ -229,20 +230,20 @@ class EvidenceResolutionTests(unittest.TestCase):
     def test_boundary_reaches_writer_reviewer_and_repair(self):
         t=self.resolved()
         bad=copy.deepcopy(DOC);bad["title"]="一天课程不用找插座，续航超长"
-        outputs=[bad,dict(summary="fixture没有发现",issues=[]),copy.deepcopy(DOC),dict(summary="fixture通过",issues=[])]
+        outputs=[copy.deepcopy(PLAN),bad,dict(summary="fixture没有发现",issues=[]),copy.deepcopy(DOC),dict(summary="fixture通过",issues=[])]
         with patch.object(w.llm,"complete",AsyncMock(side_effect=outputs)) as model:
             r=self.client.post(f"/api/tasks/{t['id']}/confirm-plan",json=dict(version=t["version"],plan=t["plan"]))
         self.assertEqual(r.status_code,202);u=db.get(t["id"])
-        self.assertEqual(u["status"],"approved");self.assertEqual(model.call_count,4)
+        self.assertEqual(u["status"],"approved");self.assertEqual(model.call_count,5)
         for call in model.call_args_list:
             self.assertIn("execution_scope",call.args[1])
             self.assertIn("battery",call.args[2]["brief"]["execution_scope"]["prohibited_topics"])
-            self.assertNotIn("all_facts",call.args[2]["package"])
+            self.assertNotIn("all_facts",call.args[2].get("package",{}))
         self.assertIsNotNone(u["repair_before"]);self.assertNotIn("续航",u["document"]["title"])
 
     def test_manual_edit_reintroducing_omitted_claim_fails_review(self):
         t=self.resolved()
-        with patch.object(w.llm,"complete",AsyncMock(side_effect=[copy.deepcopy(DOC),dict(summary="fixture通过",issues=[])])):
+        with patch.object(w.llm,"complete",AsyncMock(side_effect=[copy.deepcopy(PLAN),copy.deepcopy(DOC),dict(summary="fixture通过",issues=[])])):
             self.client.post(f"/api/tasks/{t['id']}/confirm-plan",json=dict(version=t["version"],plan=t["plan"]))
         t=db.get(t["id"]);bad=copy.deepcopy(DOC);bad["title"]="从早用到晚的电池"
         r=self.client.put(f"/api/tasks/{t['id']}/document",json=dict(version=t["version"],document=bad));self.assertEqual(r.status_code,200)
@@ -253,10 +254,17 @@ class EvidenceResolutionTests(unittest.TestCase):
         self.assertTrue(any("舍弃" in i["detail"] for i in u["review"]["issues"]))
 
     def test_planner_reintroducing_omitted_direction_is_rejected(self):
-        t=paused();p=self.preview(t);bad=copy.deepcopy(PLAN);bad["angle"]="续航一天"
-        with patch.object(w.llm,"complete",AsyncMock(return_value=bad)):
+        from backend.test_point_selection import batch
+        from unittest.mock import AsyncMock as PlainAsyncMock
+        t=paused();p=self.preview(t)
+        async def bad(model,system,payload,schema,**kw):
+            scoped=dict(t,package=copy.deepcopy(t['package']))
+            result=batch(scoped);result['candidates']=result['candidates'][:1]
+            result['candidates'][0]['direction']='续航一天'
+            return result
+        with patch.object(w.llm,'complete',PlainAsyncMock(side_effect=bad)):
             self.assertEqual(self.confirm(t,p).status_code,202)
-        u=db.get(t["id"]);self.assertEqual(u["status"],"error");self.assertFalse(w.can_export(u))
+        u=db.get(t['id']);self.assertEqual(u['status'],'error');self.assertFalse(w.can_export(u))
 
     def test_summary_reports_actual_source_missing_conditions_and_paths(self):
         t=paused();r=self.client.get(f"/api/tasks/{t['id']}/evidence-review");self.assertEqual(r.status_code,200)

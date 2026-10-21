@@ -1,0 +1,97 @@
+{
+  "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+  "active_method_files": {
+    "skills/content-strategy/SKILL.md": "5097ae8c11c27e2846be307b30f09ac17333fd1ffab1bae19728c81444767001",
+    "skills/copywriting/SKILL.md": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567",
+    "skills/social/SKILL.md": "dd4c01d0925f571562d4e8dea4af6b60bd9d491149187d94927e65280fad1bee",
+    "skills/copy-editing/SKILL.md": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f"
+  },
+  "archived_not_loaded": [
+    "skills/social/references/carousel-frameworks.md"
+  ],
+  "runtime_adapter": "planner_adapter.md",
+  "runtime_adapter_sha256": "3967ec2d77b5d6822606161b5a3bcaac91903c3931597841bbcb3e0e9e7236e8",
+  "stage_methods": {
+    "planner_selection": [
+      "content-strategy"
+    ],
+    "writer_outline": {
+      "xiaohongshu": [
+        "copywriting",
+        "social"
+      ],
+      "moments": [
+        "copywriting",
+        "social"
+      ],
+      "wechat": [
+        "copywriting",
+        "content-creation"
+      ]
+    },
+    "writer_draft": {
+      "xiaohongshu": [
+        "copywriting",
+        "social",
+        "copy-editing"
+      ],
+      "moments": [
+        "copywriting",
+        "social",
+        "copy-editing"
+      ],
+      "wechat": [
+        "copywriting",
+        "content-creation",
+        "copy-editing"
+      ]
+    },
+    "writer_repair": [
+      "copy-editing"
+    ]
+  },
+  "runtime_loader": "marketing_methods.py",
+  "skill_sources": {
+    "content-strategy": {
+      "path": "vendor/marketingskills/skills/content-strategy/SKILL.md",
+      "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "sha256": "5097ae8c11c27e2846be307b30f09ac17333fd1ffab1bae19728c81444767001",
+      "url": "https://github.com/coreyhaines31/marketingskills/blob/e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b/skills/content-strategy/SKILL.md",
+      "license": "MIT"
+    },
+    "copywriting": {
+      "path": "vendor/marketingskills/skills/copywriting/SKILL.md",
+      "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "sha256": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567",
+      "url": "https://github.com/coreyhaines31/marketingskills/blob/e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b/skills/copywriting/SKILL.md",
+      "license": "MIT"
+    },
+    "social": {
+      "path": "vendor/marketingskills/skills/social/SKILL.md",
+      "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "sha256": "dd4c01d0925f571562d4e8dea4af6b60bd9d491149187d94927e65280fad1bee",
+      "url": "https://github.com/coreyhaines31/marketingskills/blob/e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b/skills/social/SKILL.md",
+      "license": "MIT"
+    },
+    "copy-editing": {
+      "path": "vendor/marketingskills/skills/copy-editing/SKILL.md",
+      "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+      "sha256": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f",
+      "url": "https://github.com/coreyhaines31/marketingskills/blob/e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b/skills/copy-editing/SKILL.md",
+      "license": "MIT"
+    },
+    "content-creation": {
+      "path": "vendor/knowledge-work-plugins/marketing/skills/content-creation/SKILL.md",
+      "commit": "bc8f6922cfeea215a202cdcc9f0d299a990889a8",
+      "sha256": "17f0bfd536502a91c760accaa1ae6c0c76c3812973571729664133e282c5dded",
+      "url": "https://github.com/anthropics/knowledge-work-plugins/blob/bc8f6922cfeea215a202cdcc9f0d299a990889a8/marketing/skills/content-creation/SKILL.md",
+      "license": "Apache-2.0"
+    }
+  },
+  "optional_not_enabled": [
+    "dengqikuang/wechat-article-skills/wechat-article-writing"
+  ],
+  "writer_adapter": "writer_skills.md",
+  "writer_adapter_sha256": "242a8c69d32f8c6d23eb0edde7ef2cefb40130f3ddf63d90ef690f67f9ab2627",
+  "writer_case_manifest": "references/platform-writer/cases.json"
+}

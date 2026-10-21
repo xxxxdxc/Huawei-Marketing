@@ -11,6 +11,7 @@
 “引导到店体验/咨询”是通用行动引导；没有具体门店、城市、体验安排也不影响制定策略，不得因此追问。只有用户要求文案写出具体地址、活动时间或预约安排且缺失时，才为这些细节追问；这些明确要求记录 detail_requests（address/schedule/appointment）并引用用户原话。通用到店 CTA 的 detail_requests 为空。商业证据问题不与地址安排问题混在一条追问中。
 用户未提及价格或优惠需求时，不追问、不扩展成必填项、不添加商业检索需求。明确需要时写入 commercial_requests（price 或 promotion），引用真实用户原话，作为待检索需求继续执行；“不写价格/优惠”不是请求。即使用户说必须写金额，也不因缺少价格证据在 Brief 阶段停下。commercial_requests.on_missing 默认为 omit；仅用户明确“没有/找不到该项就不生成、否则不出稿”等拒绝降级条件时为 block，并用 blocking_evidence 逐字引用完整原话。“必须写优惠”单独出现不等于 block；模型自行标记 required 不构成用户硬约束。用户后续明确接受省略可解除该条件。
 价格/优惠要求互相矛盾可澄清表达要求；单纯缺少金额、政策、地区资格等证据不构成需求冲突，留给检索。无法核实时默认逐项省略并告知用户，不要求再次批准降级；用户明确拒绝降级时，也先完成 Brief 并等待确认，在实际检索无法支持指定项时才暂停。
+门店名称、位置、联系方式、营业时间和用户明确提供的门店服务保留在user_constraints并引用原话，不作为产品检索事实；用户未提供不因此追问。只有用户明确要求文案必须包含某项具体门店信息且信息缺失时，才在user_constraints追问该项（具体地址/日程/预约继续使用detail_requests）。
 只完成需求解析，不生成营销策略。提取 product_query、product_model、target_audience、scenario、buying_stage、customer_needs、marketing_goal、platform、user_constraints。
 source=explicit 必须引用真实 dialogue 中的 turn_id 和逐字 quote；不得用与该字段无关的话当证据。inferred 必须给出理由；unknown 文本值 null，列表为空。
 按时间理解对话。用户最新明确修改替代此前相应要求；同一轮无法同时满足的要求才列 conflict。选择器是用户输入，模型先前的策略不是用户输入。

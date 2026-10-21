@@ -1,6 +1,7 @@
 """Isolated fixture tests; no provider calls and no competition evidence."""
 import copy, os, tempfile, unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
+from backend.planner_test_data import AsyncMock
 TEST_DATA=tempfile.TemporaryDirectory(prefix="huawei-tests-")
 os.environ["HUAWEI_DATA_DIR"]=TEST_DATA.name
 from fastapi.testclient import TestClient
@@ -13,11 +14,11 @@ from backend.brief_test_data import parsing, responses
 from pydantic import ValidationError
 
 BRIEF=dict(audience="测试人群",scenario="测试场景",platform="moments",goal="咨询",purchase_stage="了解",pain_points=["测试"],strategy="测试策略",tone="自然",emphasis=["重量"],questions=[])
-DOC=dict(title="测试标题",lead="",paragraphs=[dict(section_id="P1",heading="携带",text="约 1.33 kg。",fact_ids=["F01"],image_id="a"*20,caption="测试产品图")],cta="欢迎咨询",tags=[])
-PLAN=dict(angle="测试角度",title_direction="场景",sections=[dict(id="P1",heading="携带",purpose="介绍重量",fact_ids=["F01"],image_id="a"*20,image_reason="测试")],cta="欢迎咨询")
+DOC=dict(title="测试标题",lead="",paragraphs=[dict(section_id="P1",heading="携带",text="约 1.33 kg。",fact_ids=["F01"],image_id="a"*20,caption="测试产品图")],cta="欢迎咨询我们的门店",tags=[])
+PLAN=dict(angle="测试角度",title_direction="场景",sections=[dict(id="P1",heading="携带",purpose="介绍重量",fact_ids=["F01"],image_id="a"*20,image_reason="测试")],cta="欢迎咨询我们的门店")
 def prepared(status="plan_ready"):
     t=db.create("这是隔离测试任务","test-product","moments")
-    t.update(brief=copy.deepcopy(BRIEF),status=status,resume_status=status,plan=copy.deepcopy(PLAN),document=copy.deepcopy(DOC),package=dict(product=dict(id="test-product",name="测试型号"),facts=[dict(id="F01",claim="约 1.33 kg",quote="测试型号重量约 1.33 kg，实际因配置而异。",source_id="S1",conditions="实际因配置而异")],sources=[dict(id="S1",title="测试资料",text="测试型号重量约 1.33 kg，实际因配置而异。",path="fixture")],images=[dict(id="a"*20,model_verified=True)],conflicts=[]))
+    t.update(brief=copy.deepcopy(BRIEF),status=status,resume_status=status,plan=copy.deepcopy(PLAN),document=copy.deepcopy(DOC),package=dict(product=dict(id="test-product",name="测试型号"),facts=[dict(id="F01",claim="约 1.33 kg",quote="测试型号重量约 1.33 kg，实际因配置而异。",source_id="S1",conditions="实际因配置而异")],sources=[dict(id="S1",title="测试资料",text="测试型号重量约 1.33 kg，实际因配置而异。",path="fixture")],images=[dict(id="a"*20,model_verified=True,visual_checked=True)],conflicts=[]))
     return db.save(t,"隔离测试资料")
 
 class WorkflowTests(unittest.TestCase):
@@ -86,7 +87,9 @@ class WorkflowTests(unittest.TestCase):
             asyncio.run(w.analyze(t));self.assertEqual(t["status"],"brief_ready")
             t["brief_confirmation"]={"analysis_hash":ba.digest(t["brief_analysis"])}
             asyncio.run(w.plan(t));self.assertEqual(t["status"],"plan_ready");self.assertIsNone(t["document"])
-            asyncio.run(w.write(t));self.assertTrue(w.can_export(t));self.assertEqual(w.llm.complete.call_count,8)
+            from backend import content_planner as cp
+            t['selection_confirmation']=dict(selection_hash=cp.selection_fingerprint(t['plan']))
+            asyncio.run(w.write(t));self.assertTrue(w.can_export(t));self.assertEqual(w.llm.complete.call_count,9)
     def test_natural_language_platform_change_restarts_confirmation(self):
         t=prepared("approved")
         output=parsing(platform="wechat",platform_turn="U2");output["requirements"]["platform"]["evidence"][0]["quote"]="公众号"

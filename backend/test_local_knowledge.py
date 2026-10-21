@@ -1,7 +1,8 @@
 """Local ZIP routing tests. Synthetic archive, no external APIs."""
 import asyncio,hashlib,io,json,tempfile,unittest,zipfile
 from pathlib import Path
-from unittest.mock import AsyncMock,patch
+from unittest.mock import patch
+from backend.planner_test_data import AsyncMock
 from PIL import Image
 from fastapi.testclient import TestClient
 from backend.test_workflow import TEST_DATA
@@ -114,7 +115,7 @@ class LocalKnowledgeTests(unittest.TestCase):
             self.assertEqual(c.post(f"/api/tasks/{t['id']}/confirm-plan",json=dict(version=t["version"],plan=t["plan"])).status_code,202)
             t=c.get(f"/api/tasks/{t['id']}").json();self.assertTrue(t["can_export"])
             self.assertEqual(c.get(f"/api/tasks/{t['id']}/export").status_code,200)
-        cloud_call.assert_not_awaited();self.assertEqual(model.await_count,8)
+        cloud_call.assert_not_awaited();self.assertEqual(model.await_count,9)
     def test_source_only_switch_preserves_model_configuration(self):
         data=Path(self.temp.name)/"source-settings";data.mkdir()
         conf=settings_module.DEFAULTS | dict(local_knowledge_path=str(self.archive))

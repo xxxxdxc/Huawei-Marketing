@@ -200,7 +200,7 @@ def assert_confirmed(t):
 
 
 def invalidate(t):
-    for key in ("brief","brief_analysis","brief_confirmation","package","plan","document","review","execution_scope"):
+    for key in ("brief","brief_analysis","brief_confirmation","package","plan","document","review","execution_scope","selection_confirmation","writer_outline","writer_stage","platform_selection"):
         t[key]=None
     t["user_image_overrides"]={}
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import ValidationError
 from .settings import DATA
 
-LABELS={"Review":"内容核验","AssetSelection":"图片筛选","Plan":"内容规划","Document":"文案生成",
+LABELS={"CandidateBatch":"候选卖点策划","ContentPlanDraft":"叙事与段落规划","Review":"内容核验","AssetSelection":"图片筛选","Plan":"内容规划","Document":"文案生成","TextRepair":"文字定向修订",
     "RetrievalFacts":"事实提取","ParsingResult":"需求解析","AudienceInsight":"受众分析","StrategyResult":"策略制定"}
 
 

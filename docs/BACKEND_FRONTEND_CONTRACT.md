@@ -1,3 +1,5 @@
+> 新版 Planner / Writer 职责及接口差异见 [PLANNER_WRITER_RESPONSIBILITIES.md](PLANNER_WRITER_RESPONSIBILITIES.md)，V3 内容以该补充契约为准。
+
 # 前后端接口补充：成稿换图复核
 
 更新日期：2026-10-18。后端由原对话维护；本文不要求前端改后端文件。
@@ -73,3 +75,37 @@ POST tasks 可指定来源；不传使用创建时默认。旧任务继续云端
 ## 0.5.1 模型输出错误与核验恢复
 
 详见 [MODEL_OUTPUT_RECOVERY.md](MODEL_OUTPUT_RECOVERY.md)。核验失败的 GET task.resume_status 统一为 needs_review，兼容历史错误记录（只读投影），前端现有“重新核验”可只调用 /review {version}。已有稿件不再因核验错误被引导回 /confirm-plan 重写。结构错误明确到字段/截断/空响应并给本机诊断编号；API预扣额度不足单独提示，不能当作内容审核失败。没有初稿的写稿错误仍保留 plan_ready。
+
+
+## Content Planner V2（2026-10-21）
+
+原Plan字段与接口继续兼容，新增候选审计、叙事、段落读者问题和图片位置。详细字段、旧客户端编辑行为及layout.json约定见 [CONTENT_PLANNER_V2.md](CONTENT_PLANNER_V2.md)。规划和成稿仍须分别确认，用户编辑后仍需重新核验。
+
+
+## 对外文案与内部阅读提示（2026-10-21）
+
+paragraph.heading继续用于工作人员定位，不进入实际推文预览、复制或marketing.md。ZIP新增evidence.md保留完整证据，单独Markdown为对外正文。新稿publication_policy_version=natural_copy_v1应用自然限定、内部说明隔离与CTA去重规则，旧稿正文不自动迁移。详见 [PUBLICATION_COPY_RULES.md](PUBLICATION_COPY_RULES.md)。
+
+
+## 候选选用与编排职责更新（2026-10-21）
+
+本版取消强制叙事框架，只用content-strategy/copywriting做取舍和编排。新增候选推荐理由、composition_rationale及POST /replan-points；执行集合与前端待更新勾选分离，失败保留原大纲。具体字段、错误状态、旧数据兼容见 [PLANNER_POINT_SELECTION.md](PLANNER_POINT_SELECTION.md)。上述更新优先于本文此前版本描述，旧评测结果不覆盖本版。
+
+
+## 平台门店营销（platform_store_v1）
+
+不新增前端设置页或确认步骤。门店资料由本次自然语言提供；后端在现有Writer大纲调用中提取，保存在只读任务字段`store_marketing_context`（details逐字值+turn_id/quote，及可选wechat_exception）。`writer_outline`可额外包含同结构的`store_context`；旧响应缺少这些字段仍有效。所有产品事实/配图/段落接口不变。
+
+公众号默认无所在门店营销，`plan.cta`和`document.cta`可为空字符串；预览、复制、导出应自然忽略空CTA，不生成占位文案。用户明确要求这篇公众号加入门店营销时例外。小红书/朋友圈在既有根级`cta`承接门店，缺资料用通用门店引导，有真实店名时使用该店名。继续不在产品正文插入门店核对、试用指导或内部段落标题。
+
+切换平台按当前平台重算，保留门店资料和确认卖点，不调用Brief；仅有门店资料或继承到店目标不构成公众号例外。新写稿设置`store_marketing_version`，门店资料变更纳入审核哈希；旧稿不自动改写，旧审核哈希保留兼容。详见`PLATFORM_STORE_MARKETING.md`。
+
+
+## 公众号排版与手动导入（2026-10-21）
+
+新增公众号专用的已核验稿件导出适配，不改变任务/Writer协议。接口及错误码见 [WECHAT_LAYOUT_EXPORT.md](WECHAT_LAYOUT_EXPORT.md)。前端仅在公众号任务 can_export、没有未保存修改且未锁定时允许打开 /api/tasks/{tid}/wechat/preview?version=N。新页面完成主题选择、富文本复制、HTML及顺序图片包下载。所有在线复制/导出检查最新版本与审核指纹。无微信API或自动发布。
+
+
+## 核验范围与文字修订（2026-10-21）
+
+Document/Plan及所有写入端点保持兼容；内部repair改为TextRepair，只输出文字/图注修改项，图片、事实编号和顺序由程序固定。review新增可选validation_errors、scope_audit、repair_decision、raw_model_issues/raw_model_summary。validation_errors非空时不可导出，显示核验意见需复核；图片问题进入现有配图编辑。原始意见和程序复核依据保留。首次报告和失败修订输出不再丢失。细节见[REVIEW_SCOPE_AND_REPAIR.md](REVIEW_SCOPE_AND_REPAIR.md)。

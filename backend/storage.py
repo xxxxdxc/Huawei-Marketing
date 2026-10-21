@@ -72,6 +72,8 @@ def digest(t):
         data["brief_confirmation"]=t.get("brief_confirmation")
     if t.get("knowledge_source"):data["knowledge_source"]=t["knowledge_source"]
     if t.get("knowledge_snapshot"):data["knowledge_snapshot"]=t["knowledge_snapshot"]
+    if t.get("store_marketing_version"):
+        data["store_marketing"]={k:t.get(k) for k in ("store_marketing_version","store_marketing_context")}
     return hashlib.sha256(json.dumps(data,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
 def cache_get(key):

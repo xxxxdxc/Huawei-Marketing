@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/coreyhaines31/marketingskills",
+  "commit": "e85f3cbc2e4a79bf33b2a12e9bdd9087d414735b",
+  "files": {
+    "LICENSE": "b70d71e24e40fce5da8f4b6f9cd862096a048e433db7f3c8cac5e348e6d34591",
+    "skills/content-strategy/SKILL.md": "5097ae8c11c27e2846be307b30f09ac17333fd1ffab1bae19728c81444767001",
+    "skills/copywriting/SKILL.md": "13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567",
+    "skills/social/SKILL.md": "dd4c01d0925f571562d4e8dea4af6b60bd9d491149187d94927e65280fad1bee",
+    "skills/social/references/carousel-frameworks.md": "e703aa530ec9f68cdf5b58e8e0d4d1a5cc3f22b9e2d3e3222f16a9763d423247",
+    "skills/copy-editing/SKILL.md": "2a072606d9d5662509ea6ef62c65719487dcb68876acab9286bde4d1af5c030f"
+  }
+}

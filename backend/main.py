@@ -1,12 +1,13 @@
 import copy, io, json, os, re, zipfile
 from contextlib import asynccontextmanager
 from typing import Literal
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from . import storage as db, schemas as S, workflow as w, brief_agent as ba
-from . import platform_change as pc, evidence_resolution as er
+from . import platform_change as pc, evidence_resolution as er, content_planner as cp
+from .content_layout import effective_layout
 from .clients import llm, ServiceError, KB_NAME
 from .knowledge import knowledge as ima
 from .settings import ROOT, ASSETS, public_settings, save_settings, get_settings
@@ -17,10 +18,12 @@ async def lifespan(app):
     db.init()
     for item in db.listing():
         if item["status"] in w.BUSY:
-            t=db.get(item["id"]);t["status"]="error";t["error"]="上次运行被中断，中间状态已保存，请重试。";db.save(t,"启动时恢复中断任务")
+            t=db.get(item["id"])
+            if w.recover_point_replan(t):continue
+            t["status"]="error";t["error"]="上次运行被中断，中间状态已保存，请重试。";db.save(t,"启动时恢复中断任务")
     yield
 
-app=FastAPI(title="华为 PC 门店图文助手",version="0.5.1",lifespan=lifespan)
+app=FastAPI(title="华为 PC 门店图文助手",version="0.6.1",lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=os.getenv("HUAWEI_ALLOWED_HOSTS","127.0.0.1,localhost,testserver").split(","))
 
 @app.middleware("http")
@@ -93,6 +96,8 @@ def get_task(tid:str):
         if t["resume_status"]=="needs_review" and t.get("error")=="模型连续两次未返回符合结构要求的完整结果，未采用不完整输出":
             t["error"]="上次内容核验未返回符合结构的结果；初稿已保留，请重新核验，无需重新写稿。"
     t["brief_analysis_hash"]=ba.digest(t["brief_analysis"]) if t.get("brief_analysis") else None
+    if t.get("plan"):t["plan"]=cp.public_plan(t["plan"])
+    if t.get("plan"):t["render_layout"]=effective_layout(w.effective_plan(t),t["platform"],t.get("document"))
     return t
 
 @app.get("/api/tasks/{tid}/history")
@@ -106,6 +111,7 @@ def restore(tid:str,body:S.Restore):
         t=db.snapshot(tid,body.target_version)
         t.pop("can_export",None)
         t.pop("brief_analysis_hash",None)
+        t["selection_confirmation"]=None;t["writer_stage"]=None
         t["brief_confirmation"]=None
         t["review"]=None;t["error"]=None
         t["status"]="needs_review" if t.get("document") else "plan_ready" if t.get("plan") else "brief_ready" if t.get("brief") else "draft"
@@ -119,10 +125,10 @@ def begin(tid,body,states,operation,bg,update=None):
         t=db.get(tid);w.require(t,states)
         if t["version"]!=body.version:raise ValueError("任务已更新，请刷新后重试")
         if update:update(t)
-        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","replan":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review"}[operation]
-        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","replan":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving"}[operation]
+        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","replan":"plan_ready","replan_points":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review"}[operation]
+        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","replan":"planning","replan_points":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving"}[operation]
         t["error"]=None;t["review"]=None
-        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认内容规划，开始写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","replan":"仅切换平台，复用需求与核心策略，重新规划","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查"}[operation],body.version)
+        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认卖点或历史规划，开始编排并写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","replan":"仅切换平台，复用需求与核心策略，重新规划","replan_points":"保存卖点选择，原版本暂时保留","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查"}[operation],body.version)
         bg.add_task(w.job,tid,operation)
         return {"accepted":True,"task_id":tid}
 
@@ -191,14 +197,25 @@ def resume_plan(tid:str,body:S.Versioned,bg:BackgroundTasks):
 def save_plan(tid:str,body:S.PlanUpdate):
     with db.LOCK:
         t=db.get(tid);w.require(t,{"plan_ready"})
-        p=body.plan.model_dump();w.validate_plan(t,p,False)
+        p=cp.reconcile(t.get("plan"),body.plan.model_dump(exclude_unset=True),t["platform"]);w.validate_plan(t,p,False)
         t["plan"]=p;t["review"]=None
         return db.save(t,"用户修改内容规划",body.version)
 
 @app.post("/api/tasks/{tid}/confirm-plan",status_code=202)
 def confirm_plan(tid:str,body:S.PlanUpdate,bg:BackgroundTasks):
     def update(t):
-        p=body.plan.model_dump();w.validate_plan(t,p);t["plan"]=p;t["user_image_overrides"]={}
+        incoming=body.plan.model_dump(exclude_unset=True)
+        if (t.get('plan') or {}).get('schema_version')=='3':
+            # Accept the local selection in one explicit confirmation, ignoring client scores.
+            if incoming.get('schema_version')!='3' or incoming.get('product_id')!=t['product_id']:
+                raise ValueError('卖点选择版本或型号已变化，请刷新')
+            p=cp.selection_plan(t,cp.trusted_candidates(t),incoming.get('selected_point_ids'))
+            t['selection_confirmation']=dict(selection_hash=cp.selection_fingerprint(p),
+                authorized_version=t['version']+1,at=db.now())
+            t['writer_outline']=None;t['writer_stage']=None
+        else:
+            p=cp.reconcile(t.get("plan"),incoming,t["platform"])
+        w.validate_plan(t,p);t["plan"]=p;t["user_image_overrides"]={}
     return begin(tid,body,{"plan_ready"},"write",bg,update)
 
 @app.put("/api/tasks/{tid}/document")
@@ -247,6 +264,20 @@ def refresh_evidence(tid:str,body:S.Versioned,bg:BackgroundTasks):
     return begin(tid,body,{"brief_ready","plan_ready","needs_review","approved"},"refresh_evidence",bg,update)
 
 
+
+@app.post("/api/tasks/{tid}/replan-points",status_code=202)
+def replan_points(tid:str,body:S.ReplanPoints,bg:BackgroundTasks):
+    def update(t):
+        ba.assert_confirmed(t)
+        candidates=cp.trusted_candidates(t)
+        selected=cp.validate_selection(t,candidates,body.selected_point_ids)
+        pending=dict(selected_point_ids=selected,original_plan_hash=cp.content_fingerprint(t["plan"]),
+            candidate_hash=cp.digest(candidates),authorized_version=t["version"]+1,requested_at=db.now())
+        t["pending_point_replan"]=pending
+        t.setdefault("point_replans",[]).append(dict(pending,status="running"))
+    return begin(tid,body,{"plan_ready"},"replan_points",bg,update)
+
+
 @app.post("/api/tasks/{tid}/replan",status_code=202)
 def retry_replan(tid:str,body:S.Versioned,bg:BackgroundTasks):
     def update(t):
@@ -293,11 +324,71 @@ def export(tid:str,bundle:bool=False):
     out=io.BytesIO()
     with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:
         z.writestr("marketing.md",text)
+        z.writestr("evidence.md",w.markdown(t,include_evidence=True))
         z.writestr("review.json",json.dumps(t["review"],ensure_ascii=False,indent=2))
+        z.writestr("layout.json",json.dumps(effective_layout(w.effective_plan(t),t["platform"],t["document"]),ensure_ascii=False,indent=2))
         used={p["image_id"] for p in t["document"]["paragraphs"] if p["image_id"]}
         for im in t["package"]["images"]:
             if im["id"] in used:z.write(ASSETS/im["id"],f"assets/{im['id']}.{im['mime'].split('/')[-1]}")
     return Response(out.getvalue(),media_type="application/zip",headers={"Content-Disposition":'attachment; filename="marketing-bundle.zip"'})
+
+# WeChat is an export adapter: no Writer/Planner/review calls or task mutations.
+def wechat_current(tid, version):
+    t = db.get(tid)
+    if t["version"] != version:
+        raise ValueError("任务已更新，请返回工作台重新打开公众号排版")
+    if t["platform"] != "wechat":
+        raise ValueError("公众号排版仅适用于微信公众号")
+    if not w.can_export(t):
+        raise ValueError("当前版本尚未通过核验，不能复制或导出公众号排版")
+    return t
+
+
+def wechat_rendered(tid, version, theme, offline=False):
+    from . import wechat_export as wx
+    t = wechat_current(tid, version)
+    return wx.render(t, effective_layout(w.effective_plan(t), t["platform"], t["document"]),
+                     db.digest(t), ASSETS, theme, offline=offline)
+
+
+@app.get("/api/tasks/{tid}/wechat/render")
+def wechat_render(tid: str, version: int = Query(ge=1), theme: Literal["moyu-green", "moyu-ticket"] = "moyu-green"):
+    return wechat_rendered(tid, version, theme)[0]
+
+
+@app.get("/api/tasks/{tid}/wechat/preview")
+def wechat_preview(tid: str, version: int = Query(ge=1), theme: Literal["moyu-green", "moyu-ticket"] = "moyu-green"):
+    from . import wechat_export as wx
+    page, nonce = wx.preview_page(wechat_rendered(tid, version, theme)[0])
+    return Response(page, media_type="text/html; charset=utf-8",
+                    headers={"Content-Security-Policy": "default-src 'none'; script-src 'nonce-" + nonce +
+                             "'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'self'",
+                             "Referrer-Policy": "no-referrer"})
+
+
+@app.get("/api/tasks/{tid}/wechat/export")
+def wechat_export(tid: str, version: int = Query(ge=1), theme: Literal["moyu-green", "moyu-ticket"] = "moyu-green", bundle: bool = False):
+    from . import wechat_export as wx
+    result, images = wechat_rendered(tid, version, theme, offline=True)
+    if bundle:
+        return Response(wx.bundle(result, images), media_type="application/zip",
+                        headers={"Content-Disposition": 'attachment; filename="wechat-images-and-layout.zip"'})
+    # A standalone HTML fragment embeds the exact verified image bytes for local viewing.
+    html = result["html"]
+    import base64
+    for image in result["assets"]:
+        uri = "data:" + image["mime"] + ";base64," + base64.b64encode(images[image["filename"]]).decode("ascii")
+        html = html.replace('src="' + image["filename"] + '"', 'src="' + uri + '"')
+    return Response(html, media_type="text/html; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="wechat-article.html"'})
+
+
+@app.get("/api/wechat/layout-source")
+def wechat_layout_source():
+    from . import wechat_export as wx
+    return Response(wx.source_bundle(), media_type="application/zip",
+                    headers={"Content-Disposition": 'attachment; filename="wechat-layout-source.zip"'})
+
 
 DIST=ROOT/"frontend/dist"
 if DIST.is_dir():

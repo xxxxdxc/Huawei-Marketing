@@ -1,0 +1,20 @@
+const { chromium } = require('@playwright/test');
+(async()=>{
+ const taskId=process.argv[2]; if(!taskId)throw new Error('Pass a task ID for read-only UI inspection');
+ const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+ const page=await browser.newPage({viewport:{width:1440,height:1050}});
+ let blockedWrites=0; const errors=[];
+ await page.route('**/api/**',route=>{if(route.request().method()!=='GET'){blockedWrites++;return route.abort();}return route.continue();});
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.addInitScript(id=>localStorage.setItem('hw-last-task',id),taskId);
+ await page.goto('http://127.0.0.1:5174/');
+ const retry=page.getByRole('button',{name:'重新生成卖点建议',exact:true});await retry.waitFor();
+ if(await retry.isDisabled())throw new Error('Expected enabled recovery action');
+ await page.screenshot({path:'qa/screenshots/live-planning-recovery-desktop.png'});
+ await page.locator('.planning-recovery').screenshot({path:'qa/screenshots/live-planning-recovery-action.png'});
+ await page.setViewportSize({width:390,height:1050});await retry.scrollIntoViewIfNeeded();
+ await page.screenshot({path:'qa/screenshots/live-planning-recovery-mobile.png'});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
+ if(blockedWrites||errors.length||overflow)throw new Error(JSON.stringify({blockedWrites,errors,overflow}));
+ console.log(JSON.stringify({readOnly:true,recoveryEnabled:true,blockedWrites,errors,overflow}));await browser.close();
+})().catch(e=>{console.error(e);process.exitCode=1;});

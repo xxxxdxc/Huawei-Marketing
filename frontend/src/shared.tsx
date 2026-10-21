@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, useId } from 'react';
 import { FileText, ImageOff } from 'lucide-react';
 import { useState } from 'react';
 import type { Task, Asset } from './types';
+import { isPlatformAdaptation } from './platformPresentation';
 
 export const PLATFORMS: Record<string, string> = { xiaohongshu: '小红书', wechat: '微信公众号', moments: '门店朋友圈' };
 export const POLICIES: Record<string, { min: number; max: number; note: string }> = {
@@ -37,7 +38,7 @@ export function Empty({ title, text, action, icon }: { title: string; text: stri
 export function AssetImage({ asset, className = '' }: { asset: Asset; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <div className={`image-unavailable ${className}`} role="img" aria-label={`${asset.description || asset.name}，图片加载失败`}><ImageOff size={22} aria-hidden="true" /><span>图片暂不可用</span></div>;
-  return <img className={className} src={`/api/assets/${encodeURIComponent(asset.id)}`} width={640} height={420} loading="lazy" alt={asset.description || asset.name} onError={() => setFailed(true)} />;
+  return <img className={className} src={import.meta.env.DEV && asset.id.startsWith('demo-planner-') && asset.url.startsWith('/planner-preview/') ? asset.url : `/api/assets/${encodeURIComponent(asset.id)}`} width={640} height={420} loading="lazy" alt={asset.description || asset.name} onError={() => setFailed(true)} />;
 }
 export function sourceLabel(value: string) { return value.replace(/https?:\/\/\S+/g, '原始资料链接（由本机服务管理）'); }
 export function localTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '时间未知' : new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date); }
@@ -46,5 +47,8 @@ export function rememberTask(id: string | null) { try { if (id) localStorage.set
 
 
 
-export const evidencePaused = (task: Task) => effectiveStatus(task) === 'needs_review' && !task.plan && !task.document && Boolean(task.package);
+export const evidencePaused = (task: Task) => !isPlatformAdaptation(task) && effectiveStatus(task) === 'needs_review' && !task.plan && !task.document && Boolean(task.package);
 export const canResumePlan = (task: Task) => evidencePaused(task) && Boolean(task.package?.coverage?.length) && !task.package?.content_policy?.blocked_requests?.length && !task.package?.evidence_gaps?.some(g => Boolean(g.blocking_reason));
+
+// Older services expose this failure only as text; do not classify all evidence pauses as planner failures.
+export const plannerGenerationFailed = (task: Task) => evidencePaused(task) && Boolean(task.error && /候选卖点|卖点候选|规划结果|内容规划|Content Planner/i.test(task.error));

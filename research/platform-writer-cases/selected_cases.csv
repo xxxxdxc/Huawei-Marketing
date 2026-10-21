@@ -1,0 +1,5 @@
+﻿case_id,platform,title,source_url,content_type,audience_task_score_20,hook_score_15,scene_score_20,organization_score_15,naturalness_score_15,platform_fit_score_10,cta_score_5,total_score_100,risk_flags,analysis_file,selection_status
+C019,web-media,大学生上课用笔记本电脑推荐！华为四款机型各有亮点,https://diy.zol.com.cn/1153/11537575.html,选购编辑文章,,,,,,,,,只学习方法；产品事实、促销、体验与图片不可迁移；未核实成效,backend/references/platform-writer/C019-zol.md,user_approved_reference
+C020,web-media,大学生千元档购机指南：华为笔记本坚持稳价，叠加国补入手更实惠,https://article.pchome.net/content-2192863.html,选购营销文章,,,,,,,,,只学习方法；产品事实、促销、体验与图片不可迁移；未核实成效,backend/references/platform-writer/C020-pchome.md,user_approved_reference
+C021,web-media,小红书携手华为，邀你一起「轻」听「折叠」的奥秘！,https://mobile.adquan.com/info/detail-333811,手机品牌活动分析；非原生小红书PC帖子,,,,,,,,,只学习方法；产品事实、促销、体验与图片不可迁移；未核实成效,backend/references/platform-writer/C021-adquan.md,user_approved_reference
+C022,web-media,国补至高立减2000元！烟台微星专卖店线下购机也超实惠！,https://www.gamersky.com/hardware/202411/1844493.shtml,品牌供稿的门店营销文章,,,,,,,,,只学习方法；产品事实、促销、体验与图片不可迁移；未核实成效,backend/references/platform-writer/C022-gamersky.md,user_approved_reference

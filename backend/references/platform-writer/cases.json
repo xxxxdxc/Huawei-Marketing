@@ -1,0 +1,82 @@
+{
+  "version": "user_selected_v1",
+  "approved_case_ids": [
+    "C019",
+    "C020",
+    "C021",
+    "C022"
+  ],
+  "cases": [
+    {
+      "case_id": "C019",
+      "path": "C019-zol.md",
+      "source_url": "https://diy.zol.com.cn/1153/11537575.html",
+      "title": "大学生上课用笔记本电脑推荐！华为四款机型各有亮点",
+      "account_name": "中关村在线；作者：海是天的倒影",
+      "publish_date": "2026-03-25 12:20:27",
+      "content_type": "选购编辑文章",
+      "access_notes": "上轮已读取主要正文；图片未观察。",
+      "selection_status": "user_approved_reference",
+      "sha256": "deefa58d7d105cf32474dabafdceb5db91e941aae0628d4c23f5ec572a72cccc"
+    },
+    {
+      "case_id": "C020",
+      "path": "C020-pchome.md",
+      "source_url": "https://article.pchome.net/content-2192863.html",
+      "title": "大学生千元档购机指南：华为笔记本坚持稳价，叠加国补入手更实惠",
+      "account_name": "PChome；编辑：李滕悦",
+      "publish_date": "2026-01-22 17:27:57",
+      "content_type": "选购营销文章",
+      "access_notes": "此前研究实际读到开头及部分机型正文；上轮重访超时。只提炼已读部分，不分析未读结尾；图片未观察。",
+      "selection_status": "user_approved_reference",
+      "sha256": "8446e5f60446b2d05a06e9d5b115c4c617bf9e5e9d14d51ae7d17fddf12d13c8"
+    },
+    {
+      "case_id": "C021",
+      "path": "C021-adquan.md",
+      "source_url": "https://mobile.adquan.com/info/detail-333811",
+      "title": "小红书携手华为，邀你一起「轻」听「折叠」的奥秘！",
+      "account_name": "广告门；发布：营销业界",
+      "publish_date": "2023-07-01 21:47",
+      "content_type": "手机品牌活动分析；非原生小红书PC帖子",
+      "access_notes": "上轮已读取主要正文；图片未观察。",
+      "selection_status": "user_approved_reference",
+      "sha256": "f72c4332be598ff68e9687992faeba8e39ef079f91a93896928d7a869e1f3dd8"
+    },
+    {
+      "case_id": "C022",
+      "path": "C022-gamersky.md",
+      "source_url": "https://www.gamersky.com/hardware/202411/1844493.shtml",
+      "title": "国补至高立减2000元！烟台微星专卖店线下购机也超实惠！",
+      "account_name": "游民星空；来源：微星科技；作者：未知；编辑：听风飞舞",
+      "publish_date": "2024-11-13 15:20:06",
+      "content_type": "品牌供稿的门店营销文章",
+      "access_notes": "上轮已读取主要正文及结尾；图片未观察。",
+      "selection_status": "user_approved_reference",
+      "sha256": "708e3f3f8c571ccda2b48c3137708255bece8e56145085346640fb6031469059"
+    }
+  ],
+  "routes": {
+    "wechat": [
+      "C019",
+      "C020",
+      "C021"
+    ],
+    "xiaohongshu": [
+      "C019",
+      "C020",
+      "C021",
+      "C022"
+    ],
+    "moments": [
+      "C021",
+      "C022"
+    ]
+  },
+  "checksum_scope": "SHA-256 of local method-card UTF-8 bytes, not original webpage content",
+  "stage_headings": {
+    "outline": "## Outline principles",
+    "draft": "## Draft principles",
+    "repair": "## Repair principles"
+  }
+}

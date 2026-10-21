@@ -19,7 +19,7 @@ TOPICS = {
     "promotion": ("优惠", r"优惠|补贴|折扣|赠品|促销|领券"),
     "safety": ("安全条件", r"电压|安全|禁忌|风险|充电协议"),
 }
-RULES = """必须遵守 execution_scope：已由用户明确舍弃的请求、方向、关联事实和主题不得在标题、导语、正文、图注、标签、CTA或图片画面中重新出现；即使原始资料或原始Brief提及也不能恢复。execution_scope.relaxed_constraints 是用户已明确授权本次放宽的原条件，仅对其列明请求生效；其余硬条件继续执行。只使用 execution_brief 和当前可用事实，不把缺证改称已验证，不把取舍说明写进营销正文。Reviewer必须逐项检查遗漏边界，包括同义改写；修订只删除越界表达，不恢复已舍弃方向。"""
+RULES = """必须遵守 execution_scope：已由用户明确舍弃的请求、方向、关联事实和主题不得在标题、导语、正文、图注、标签、CTA或图片画面中重新出现；即使原始资料或原始Brief提及也不能恢复。execution_scope.relaxed_constraints 是用户已明确授权本次放宽的原条件，仅对其列明请求生效；其余硬条件继续执行。只使用 execution_brief 和当前可用事实，不把缺证改称已验证，不把取舍说明写进营销正文。Reviewer必须逐项检查遗漏边界，包括同义改写；修订只删除越界表达，不恢复已舍弃方向。执行边界是闭合清单，只按当前prohibited_topics及实际omitted_request_ids/omitted_direction_ids解释，不得擅自扩大。普通演示文稿、图表、会议材料是使用场景，不等于产品性能卖点；只舍弃续航/电池容量时，不得因此排除普通PPT图表。"""
 
 
 def digest(value):
@@ -343,7 +343,7 @@ def text_issues(t,text,location):
 
 def assert_plan(t,plan):
     if not t.get("execution_scope"):return
-    text=" ".join([plan["angle"],plan["title_direction"],plan["cta"],*[s["heading"]+" "+s["purpose"]+" "+s["image_reason"] for s in plan["sections"]]])
+    text=json.dumps({k:v for k,v in plan.items() if k!="planning_analysis"},ensure_ascii=False)
     if text_issues(t,text,"内容规划"):raise ValueError("内容规划重新引入已舍弃方向，请按执行边界重新规划")
 
 

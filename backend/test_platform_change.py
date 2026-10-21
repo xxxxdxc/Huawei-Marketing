@@ -5,7 +5,8 @@ import hashlib
 import io
 import json
 import unittest
-from unittest.mock import AsyncMock,patch
+from unittest.mock import patch
+from backend.planner_test_data import AsyncMock
 import httpx
 from PIL import Image
 from fastapi.testclient import TestClient
@@ -159,11 +160,12 @@ class PlatformChangeTests(unittest.TestCase):
             r=self.client.post(f"/api/tasks/{t['id']}/replan",json=dict(version=u["version"]))
         self.assertEqual(r.status_code,202);self.assertEqual(db.get(t["id"])["status"],"plan_ready");self.assertEqual(model.call_count,1)
 
-    def test_planner_cannot_silently_produce_insufficient_images(self):
+    def test_selection_does_not_preassign_image_slots(self):
         t=task()
         with patch.object(w.llm,"complete",AsyncMock(return_value=copy.deepcopy(PLAN))):
             self.client.post(f"/api/tasks/{t['id']}/change-platform",json=dict(version=t["version"],platform="wechat"))
-        self.assertEqual(db.get(t["id"])["status"],"error")
+        self.assertEqual(db.get(t["id"])["status"],"plan_ready")
+        self.assertEqual(db.get(t["id"])["plan"]["sections"],[])
         self.assertFalse(w.can_export(db.get(t["id"])))
 
     def test_vmall_failure_does_not_erase_existing_product_facts(self):

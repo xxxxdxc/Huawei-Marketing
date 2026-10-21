@@ -1,0 +1,34 @@
+{
+  "phase": "user_approved_case_integration",
+  "date": "2026-10-21",
+  "case_ids": [
+    "C019",
+    "C020",
+    "C021",
+    "C022"
+  ],
+  "tests": {
+    "command": ".venv/Scripts/python.exe -m unittest discover -s backend -t . -p test_*.py",
+    "count": 402,
+    "seconds": 39.475,
+    "result": "passed",
+    "live_model_calls": 0
+  },
+  "runtime_wiring": "isolated mocked outline/draft/repair calls inspect actual system prompt and writer_runs.case_sources",
+  "live_quality_comparison": "not_run",
+  "deployment": "not_requested_not_performed",
+  "files_sha256": {
+    "backend/writer_cases.py": "c77bfb78992a739e7badf57066b5b657bbf709e96b742ba2843dff893e3de441",
+    "backend/marketing_methods.py": "75d82d56eb6472d46e4fba7b36c0cfb43322cd20637434611884595bcba00775",
+    "backend/platform_writer.py": "869bfb268bdc6c68b7585c708e31f3efd4e92668d6a9414d73b70517267602fe",
+    "backend/writer_skills.md": "5e3bf6b16041b35c5490b266fd615a1bcb13485719b0e4623776ef05daef27dc",
+    "backend/planner_sources.json": "a65653a054006ae5b18b33b7a9ade5088228041a98c0d9a887c62db12ebb0b47",
+    "backend/test_writer_case_references.py": "ce1a0a7369961e2e753747d9b9d015b572571e48d03a97cc6ff6a712cfb378fd",
+    "backend/references/platform-writer/C019-zol.md": "deefa58d7d105cf32474dabafdceb5db91e941aae0628d4c23f5ec572a72cccc",
+    "backend/references/platform-writer/C020-pchome.md": "8446e5f60446b2d05a06e9d5b115c4c617bf9e5e9d14d51ae7d17fddf12d13c8",
+    "backend/references/platform-writer/C021-adquan.md": "f72c4332be598ff68e9687992faeba8e39ef079f91a93896928d7a869e1f3dd8",
+    "backend/references/platform-writer/C022-gamersky.md": "708e3f3f8c571ccda2b48c3137708255bece8e56145085346640fb6031469059",
+    "backend/references/platform-writer/cases.json": "13a91c0bc16d129d7ab2bba345bf6552d1d2adbed376f23181a42727ea90a292",
+    "backend/references/platform-writer/user-visual-note.md": "e7577df489b9ad19235f1b9f68155174ed31349888b052626a687d5393986a42"
+  }
+}

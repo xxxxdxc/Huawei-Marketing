@@ -32,6 +32,6 @@ export default function StartPage({ products, catalogState, catalogError, hasKey
     {(catalogError || (catalogState === 'ready' && products.length === 0)) && <div className="notice warning" role="alert"><p>{catalogError || '产品目录为空，请确认知识库访问权限。'}你仍可先输入需求。</p><button type="button" className="text-link" onClick={onReconnect}>重新读取知识库</button></div>}
     {!hasKey && <div className="setup-note"><span>开始前，请先连接模型服务。</span><button type="button" className="text-link" disabled={pending} onClick={onSettings}>前往连接设置</button></div>}
     <section className="scenario-section" aria-label="场景灵感"><h2>从一个场景开始</h2><div className="scenario-grid">{examples.map(({ title, subtitle, Icon, text }, i) => <button disabled={pending} type="button" key={title} aria-label={title} className={`scenario-card scenario-${i}`} onClick={() => { setRaw(text); document.querySelector<HTMLTextAreaElement>('.task-input')?.focus(); }}><span className="scenario-icon"><Icon size={24} strokeWidth={1.8} aria-hidden="true" /></span><span><strong>{title}</strong><small>{subtitle}</small></span></button>)}</div></section>
-    <p className="home-footnote">产品资料来自指定 ima 知识库 · 策略与内容规划由你确认</p>
+    <p className="home-footnote">产品资料来自指定 ima 知识库 · 策略与核心卖点由你确认</p>
   </div>;
 }

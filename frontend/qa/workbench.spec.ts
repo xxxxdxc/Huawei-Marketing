@@ -206,7 +206,7 @@ test('review issues locate only known paragraph and keep export disabled', async
   await mockApi(page, makeTask('needs_review')); await page.goto('/');
   await expect(page.getByRole('heading', { name: '仍有问题需要处理' })).toBeVisible();
   await page.getByRole('button', { name: '定位到编辑位置' }).click();
-  await expect(page.getByLabel('段落 1 标题', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('段落 1 内部阅读提示', { exact: true })).toBeFocused();
   await expect(page.getByRole('button', { name: 'Markdown', exact: true })).toBeDisabled();
   await screenshot(page, 'review-desktop');
 });

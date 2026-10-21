@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "华为 PC 门店图文助手",
-    "version": "0.5.1"
+    "version": "0.6.1"
   },
   "paths": {
     "/api/health": {
@@ -908,6 +908,53 @@
         }
       }
     },
+    "/api/tasks/{tid}/replan-points": {
+      "post": {
+        "summary": "Replan Points",
+        "operationId": "replan_points_api_tasks__tid__replan_points_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplanPoints"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tasks/{tid}/replan": {
       "post": {
         "summary": "Retry Replan",
@@ -1127,6 +1174,215 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/wechat/render": {
+      "get": {
+        "summary": "Wechat Render",
+        "operationId": "wechat_render_api_tasks__tid__wechat_render_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Version"
+            }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "moyu-green",
+                "moyu-ticket"
+              ],
+              "type": "string",
+              "default": "moyu-green",
+              "title": "Theme"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/wechat/preview": {
+      "get": {
+        "summary": "Wechat Preview",
+        "operationId": "wechat_preview_api_tasks__tid__wechat_preview_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Version"
+            }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "moyu-green",
+                "moyu-ticket"
+              ],
+              "type": "string",
+              "default": "moyu-green",
+              "title": "Theme"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/wechat/export": {
+      "get": {
+        "summary": "Wechat Export",
+        "operationId": "wechat_export_api_tasks__tid__wechat_export_get",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Version"
+            }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "moyu-green",
+                "moyu-ticket"
+              ],
+              "type": "string",
+              "default": "moyu-green",
+              "title": "Theme"
+            }
+          },
+          {
+            "name": "bundle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Bundle"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wechat/layout-source": {
+      "get": {
+        "summary": "Wechat Layout Source",
+        "operationId": "wechat_layout_source_api_wechat_layout_source_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -1726,6 +1982,38 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "ImagePosition": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "before_section",
+              "after_section",
+              "carousel",
+              "grid"
+            ],
+            "title": "Kind"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ImagePosition"
+      },
       "ImageRequest": {
         "properties": {
           "id": {
@@ -1988,6 +2276,40 @@
         ],
         "title": "Modify"
       },
+      "Narrative": {
+        "properties": {
+          "framework": {
+            "type": "string",
+            "enum": [
+              "scene_story",
+              "problem_solution",
+              "buying_guide",
+              "selling_point_focus"
+            ],
+            "title": "Framework"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "ordering_rationale": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Ordering Rationale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "framework",
+          "reason",
+          "ordering_rationale"
+        ],
+        "title": "Narrative"
+      },
       "NewTask": {
         "properties": {
           "knowledge_source": {
@@ -2098,6 +2420,96 @@
       },
       "Plan": {
         "properties": {
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "2",
+                  "3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "selection",
+                  "composed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "narrative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Narrative"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "composition_rationale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composition Rationale"
+          },
+          "selected_point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Point Ids"
+          },
+          "planning_analysis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planning Analysis"
+          },
           "angle": {
             "type": "string",
             "minLength": 1,
@@ -2113,7 +2525,6 @@
             },
             "type": "array",
             "maxItems": 8,
-            "minItems": 1,
             "title": "Sections"
           },
           "cta": {
@@ -2133,6 +2544,72 @@
       },
       "PlanSection": {
         "properties": {
+          "reader_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reader Question"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "opening",
+                  "argument",
+                  "objection",
+                  "summary",
+                  "cta"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Ids"
+          },
+          "image_position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImagePosition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_chars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 900.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Chars"
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -2323,6 +2800,37 @@
           "reason"
         ],
         "title": "ReasonedPoint"
+      },
+      "ReplanPoints": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "selected_point_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Selected Point Ids"
+          },
+          "replace_current_plan": {
+            "type": "boolean",
+            "const": true,
+            "title": "Replace Current Plan"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "selected_point_ids",
+          "replace_current_plan"
+        ],
+        "title": "ReplanPoints"
       },
       "Requirements": {
         "properties": {

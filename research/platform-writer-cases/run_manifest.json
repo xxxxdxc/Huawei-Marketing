@@ -1,0 +1,56 @@
+{
+  "phase": 1,
+  "checked_at": "2026-10-21",
+  "candidate_count": 28,
+  "access_counts": {
+    "metadata_only": 15,
+    "body_accessible": 13
+  },
+  "native_link_leads": 9,
+  "native_wechat_link_leads": 8,
+  "native_xiaohongshu_link_leads": 1,
+  "body_verified_native_target_posts": 0,
+  "selected_count": 0,
+  "targets": {
+    "xiaohongshu": 12,
+    "wechat_official": 10,
+    "wechat_moments": 8
+  },
+  "phase_scope": "candidate discovery and access verification only; no deep analysis or quality scores",
+  "production_files_before": {
+    "backend/platform_writer.py": "d4c70302d0e9e42a64429758c5bf555a56862f55442167e4571146c5b3463fa3",
+    "backend/writer_skills.md": "39309283dc284c6c7502beff53d1b570f6a4a36384f7d7361a0672b15d60f87f",
+    "backend/marketing_methods.py": "54faa1c3035cf01721709bcba1f3716eeb87f2c082b415479106aab3ca2c8bb6",
+    "backend/workflow.py": "7b5217363c04b9fd1090e16f91bd3213914e067a3e920725ddb7e2b188901c52",
+    "backend/store_marketing.py": "e68f3e6c0baa0a6533501545a9827626330c5041f3a00bdc73ab4f6618686bfa",
+    "backend/brief_adapter.md": "61e65559f2d958db0d138a661c613dca7792e07b3859149ac764ad5ac84df8ed",
+    "backend/planner_sources.json": "26b3a173bdc32e641fdd82380ebc88b296574c468917e8223cb57e739fe3947c"
+  },
+  "production_files_after": {
+    "backend/platform_writer.py": "d4c70302d0e9e42a64429758c5bf555a56862f55442167e4571146c5b3463fa3",
+    "backend/writer_skills.md": "39309283dc284c6c7502beff53d1b570f6a4a36384f7d7361a0672b15d60f87f",
+    "backend/marketing_methods.py": "54faa1c3035cf01721709bcba1f3716eeb87f2c082b415479106aab3ca2c8bb6",
+    "backend/workflow.py": "7b5217363c04b9fd1090e16f91bd3213914e067a3e920725ddb7e2b188901c52",
+    "backend/store_marketing.py": "e68f3e6c0baa0a6533501545a9827626330c5041f3a00bdc73ab4f6618686bfa",
+    "backend/brief_adapter.md": "61e65559f2d958db0d138a661c613dca7792e07b3859149ac764ad5ac84df8ed",
+    "backend/planner_sources.json": "26b3a173bdc32e641fdd82380ebc88b296574c468917e8223cb57e739fe3947c"
+  },
+  "production_files_unchanged": true,
+  "live_model_calls": 0,
+  "phase1_artifact_files": [
+    "CANDIDATE_OVERVIEW.md",
+    "SCORING_RUBRIC.md",
+    "SEARCH_PLAN.md",
+    "candidate_sources.csv",
+    "cases/wechat-moments/README.md",
+    "cases/wechat-official/README.md",
+    "cases/xiaohongshu/README.md",
+    "manual_submission_template.csv",
+    "phase1_access_log.md",
+    "platform_patterns.md",
+    "research_gaps.md",
+    "run_manifest.json",
+    "selected_cases.csv",
+    "writing_rules.md"
+  ]
+}
