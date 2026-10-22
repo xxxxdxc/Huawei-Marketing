@@ -270,7 +270,7 @@ class EvidenceResolutionTests(unittest.TestCase):
         t=paused();r=self.client.get(f"/api/tasks/{t['id']}/evidence-review");self.assertEqual(r.status_code,200)
         body=r.json();self.assertEqual(body["knowledge_source"],t.get("knowledge_source","ima"))
         self.assertEqual([u["request"]["id"] for u in body["unmet_requirements"]],["R1","R3"])
-        self.assertFalse(body["task_upload_supported"]);self.assertEqual(len(body["actions"]),3)
+        self.assertFalse(body["task_upload_supported"]);self.assertEqual(set(body["actions"]),{"adjust_content","refresh_evidence","manual_evidence","modify_requirements"})
         self.assertEqual(body["material_requirements"][0]["conditions"],["具体配置"])
 
     def test_overall_modify_clears_execution_scope(self):

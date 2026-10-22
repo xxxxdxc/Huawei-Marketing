@@ -2,6 +2,7 @@
 import copy
 import re
 from .clients import ServiceError
+from . import evidence_usage as usage
 
 COMMERCIAL={"price","promotion"}
 
@@ -57,7 +58,9 @@ def normalize_needs(needs, turns):
 def normalize_strategy(strategy, needs):
     result=copy.deepcopy(strategy);allowed={n["category"] for n in needs}
     plan=result["retrieval_plan"]
-    for r in plan["facts"]:r["category"]=request_kind(r)
+    for r in plan["facts"]:
+        r["category"]=request_kind(r)
+        if r.get("guardrail","none")=="none":r["waivable"]=True
     plan["facts"]=[r for r in plan["facts"] if r["category"]=="product" or r["category"] in allowed]
     products=[r for r in plan["facts"] if r["category"]=="product"]
     if not products:raise ServiceError("策略缺少产品事实检索任务，请重新分析需求")
@@ -86,7 +89,7 @@ def apply(t):
     all_facts=copy.deepcopy(p["facts"]);fact_ids={f["id"] for f in all_facts}
     for c in coverage:
         if not set(c["fact_ids"])<=fact_ids:raise ServiceError("覆盖结果引用了不存在的事实")
-        if c["status"]=="supported" and not c["fact_ids"]:raise ServiceError("检索任务没有事实依据却被标记为已支持")
+        if c["status"] in ("supported","partial") and not c["fact_ids"]:raise ServiceError("检索任务没有事实依据却被标记为已支持")
         if c["status"]=="not_found" and c["fact_ids"]:raise ServiceError("未命中的检索任务不能引用事实")
     by_coverage={c["request_id"]:c for c in coverage}
     needs=a.get("commercial_requests",[])
@@ -103,7 +106,7 @@ def apply(t):
     for c in coverage:
         r=by_request[c["request_id"]];kind=request_kind(r)
         if c["status"]!="supported" and kind in COMMERCIAL:missing(r["id"],c["status"],c["reason"])
-        elif kind=="product" and (c["status"]=="conflict" or (r["priority"]=="required" and c["status"]!="supported")):
+        elif kind=="product" and (c["status"]=="conflict" or (c["status"]=="partial" and usage.partial_is_blocked(t,r)) or (r["priority"]=="required" and c["status"] not in ("supported","partial"))):
             gaps.append(dict(request=r,coverage=c,blocking_reason="product_evidence"))
     conflicts=copy.deepcopy(p.get("conflicts",[]));active=[];sources={s["id"] for s in p["sources"]}
     for conflict in conflicts:
@@ -136,8 +139,9 @@ def apply(t):
             if omissions[rid]["status"]=="conflict":bad.update(c["fact_ids"])
         else:good.update(valid_financial.get(rid,set()))
     good-=bad
-    kept=[];removed=[];kept_kinds=set()
+    kept=[];removed=[];kept_kinds=set();boundaries=[]
     for f in all_facts:
+        if usage.guidance_fact(f):boundaries.append(copy.deepcopy(f));continue
         kind=kinds[f["id"]]
         if kind in COMMERCIAL:
             if kind not in allowed or f["id"] not in good:removed.append(f["id"]);continue
@@ -146,7 +150,7 @@ def apply(t):
     kept_ids={f["id"] for f in kept}
     for c in coverage:
         r=by_request[c["request_id"]];kind=request_kind(r)
-        if c["status"]=="supported" and not set(c["fact_ids"]) & kept_ids:
+        if c["status"] in ("supported","partial") and not set(c["fact_ids"]) & kept_ids:
             if kind in COMMERCIAL:missing(r["id"],"not_usable","返回的资料不构成该项可引用的独立商业证据")
             elif r["priority"]=="required":gaps.append(dict(request=r,coverage=c,blocking_reason="product_evidence",reason="该核心请求没有可用的独立产品事实"))
             # An optional product request citing only a removed policy card is omitted.
@@ -167,6 +171,7 @@ def apply(t):
         else:
             lead=label+"资料存在冲突" if any(d["status"]=="conflict" for d in omissions.values()) else "未找到"+label+"依据"
             notices.append(lead+"，本次不包含这些内容，继续使用已有产品事实做规划；其他有依据的信息继续保留。")
+    p["writing_boundaries"]=boundaries
     p["all_facts"]=all_facts;p["all_conflicts"]=conflicts;p["conflicts"]=active;p["facts"]=kept
     omitted_categories=sorted((COMMERCIAL-allowed) | (missing_kinds-kept_kinds))
     p["content_policy"]=dict(omit_commercial=not bool(kept_kinds),allowed_categories=sorted(kept_kinds),requested_categories=sorted(allowed),omitted_categories=omitted_categories,omitted_requests=list(omissions.values()),omitted_fact_ids=removed,blocked_requests=blocked,notices=notices,approval_required=False)

@@ -115,3 +115,8 @@ Document/Plan及所有写入端点保持兼容；内部repair改为TextRepair，
 
 旧小红书任务兼容：仅接受按原 `min_images=3,max_images=6` 平台 policy 计算的精确候选上下文哈希；需求、事实及图片等上下文仍须一致，不能借规则升级沿用变化后的旧候选。
 验证：453 项后端回归、29 项相关浏览器回归及 TypeScript/Vite 构建通过。截图任务保留原 Brief、资料与卖点，以两张图完成 Writer 和独立核验（V53 approved）。本机恢复记录位于忽略目录 `.local/image-count-recovery/`。
+
+
+手动补充文字依据：`POST /api/tasks/{tid}/manual-evidence`，请求与处理限制见 `MANUAL_EVIDENCE.md`。审查 actions 新增 manual_evidence；原 refresh-evidence 仍只重读原资料源。新增 Source.source_type=user_manual、source_url、link_verified=false，以及 Review.source_verification；旧数据和接口保持兼容。
+
+coverage.status 新增 partial，fact_ids 保留已有支持；missing_details、usage_limits 为工作人员说明。不要将 partial 渲染为“没有直接依据”或“全部已核实”；普通检索条件部分缺失可继续，真实 guardrail/冲突和用户明确完整条件要求仍处理。写作规则卡仅在 writing_boundaries/all_facts 追溯，不进入可宣传事实。

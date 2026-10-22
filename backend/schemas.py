@@ -128,6 +128,27 @@ class NewTask(Strict):
 class Versioned(Strict):
     version: int = Field(ge=1)
 
+class ManualEvidenceInput(Versioned):
+    product_id: str = Field(min_length=1, max_length=200)
+    request_ids: list[str] = Field(min_length=1, max_length=8)
+    text: str = Field(min_length=32, max_length=20000)
+    source_url: str = Field(min_length=8, max_length=2000)
+    source_title: str = Field(default="", max_length=200)
+    conditions: str = Field(default="", max_length=1500)
+    confirmed: Literal[True]
+
+    @model_validator(mode="after")
+    def valid_manual_source(self):
+        from urllib.parse import urlsplit
+        parsed=urlsplit(self.source_url)
+        if (self.source_url != self.source_url.strip() or parsed.scheme not in ("http","https")
+            or not parsed.hostname or parsed.username or parsed.password or any(c.isspace() for c in self.source_url)):
+            raise ValueError("来源链接须为无账号密码的完整 HTTP/HTTPS 地址")
+        if len(self.text.strip())<32:raise ValueError("请粘贴至少32字的资料原文及适用条件，不能只填孤立数字")
+        if len(set(self.request_ids))!=len(self.request_ids):raise ValueError("关联需求不可重复")
+        return self
+
+
 class BriefUpdate(Versioned):
     brief: Brief | None = None
     analysis_hash: str | None = None
@@ -357,9 +378,15 @@ class BriefAnswers(Versioned):
 
 class FactCoverage(Strict):
     request_id: str
-    status: Literal["supported", "not_found", "conflict"]
+    status: Literal["supported", "partial", "not_found", "conflict"]
     fact_ids: list[str]
     reason: str = Field(min_length=1)
+    missing_details: list[str] = Field(default_factory=list)
+    usage_limits: list[str] = Field(default_factory=list)
+
+class CoverageAssessment(Strict):
+    coverage: list[FactCoverage]
+
 
 class EvidenceConflict(Strict):
     category: Literal["product", "price", "promotion"]

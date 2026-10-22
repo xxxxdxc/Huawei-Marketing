@@ -93,15 +93,24 @@ def request_context(t):
 
 def shared_context(t,policy):
     requests,coverage,mandatory=request_context(t)
-    return dict(product_id=t['product_id'],product=t['package']['product'],brief=ba.context(t),
+    result=dict(product_id=t['product_id'],product=t['package']['product'],brief=ba.context(t),
         facts=t['package']['facts'],
         images=[{k:v for k,v in i.items() if k in ('id','name','model','description','visual_description','selection_reason','width','height','model_verified','visual_checked')} for i in t['package']['images']],
         policy=policy,condition_presentation=pub.condition_guidance(t['package']['facts']),
         suggested_point_counts=SUGGESTED_COUNTS[t['platform']],retrieval_requests=list(requests.values()),mandatory_requests=mandatory,mandatory_needs=mandatory_needs(t))
+    from .manual_evidence import provenance
+    if provenance(t):result['source_verification']=provenance(t)
+    partial=[copy.deepcopy(c) for c in coverage.values() if c.get('status')=='partial']
+    if partial:result['evidence_usage']=partial
+    return result
 
 def candidate_context_hash(t):
     from .workflow import PLATFORMS
-    return digest(shared_context(t,PLATFORMS[t['platform']]))
+    context=shared_context(t,PLATFORMS[t['platform']])
+    # Derived coverage wording is prompt guidance, not a change to raw facts/requirements.
+    # Every reassessment already invalidates the current plan before this can change.
+    context.pop('evidence_usage',None)
+    return digest(context)
 
 def candidate_context_matches(t, saved):
     if saved==candidate_context_hash(t):return True
@@ -110,7 +119,8 @@ def candidate_context_matches(t, saved):
     from .workflow import PLATFORMS
     legacy=dict(PLATFORMS['xiaohongshu'],min_images=3,max_images=6)
     legacy.pop('recommended_images',None);legacy.pop('image_count_note',None)
-    return saved==digest(shared_context(t,legacy))
+    context=shared_context(t,legacy);context.pop('evidence_usage',None)
+    return saved==digest(context)
 
 
 def rank_candidates(t,result):

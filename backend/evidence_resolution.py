@@ -3,7 +3,7 @@ import copy
 import hashlib
 import json
 import re
-from . import brief_agent as ba, evidence_policy as ep, storage as db
+from . import brief_agent as ba, evidence_policy as ep, storage as db, evidence_usage as usage
 from .clients import ServiceError
 
 TOPICS = {
@@ -45,7 +45,7 @@ def assert_scope(t):
 
 
 def protected_reason(t,r):
-    if not r.get("waivable",True) or r.get("guardrail","none")!="none":
+    if r.get("guardrail","none")!="none":
         return "该请求属于不可局部舍弃的产品身份、安全或必要兼容门槛"
     if re.search(r"安全|禁忌|电压|充电协议|产品身份|确认.*型号|核对.*型号",r["question"]):
         return "涉及产品身份或必要安全核查，不能通过内容取舍绕过"
@@ -132,21 +132,21 @@ def project(t,omitted,dropped):
     view=copy.deepcopy(t);a=view["brief_analysis"];p=raw_package(t);view["package"]=p
     requests=a["retrieval_plan"]["facts"]
     cov={c["request_id"]:c for c in p.get("coverage",[])}
-    surviving_support={fid for r in requests if r["id"] not in omitted and cov.get(r["id"],{}).get("status")=="supported" for fid in cov[r["id"]]["fact_ids"]}
+    surviving_support={fid for r in requests if r["id"] not in omitted and cov.get(r["id"],{}).get("status") in ("supported","partial") for fid in cov[r["id"]]["fact_ids"]}
     blocked_facts={fid for rid in omitted for fid in cov.get(rid,{}).get("fact_ids",[])}-surviving_support
     for conflict in p.get("conflicts",[]):
         if isinstance(conflict,dict):
             for rid in conflict["request_ids"]:
                 blocked_facts.update(cov.get(rid,{}).get("fact_ids",[]))
     retained=[r for r in requests if r["id"] not in omitted]
-    allowed_facts={fid for r in retained for fid in cov.get(r["id"],{}).get("fact_ids",[]) if cov.get(r["id"],{}).get("status")=="supported"}-blocked_facts
+    allowed_facts={fid for r in retained for fid in cov.get(r["id"],{}).get("fact_ids",[]) if cov.get(r["id"],{}).get("status") in ("supported","partial")}-blocked_facts
     p["facts"]=[f for f in p.get("facts",[]) if f["id"] in allowed_facts]
     # Unsupported/conflicting retained requests stay exactly as reported, except
     # references to quarantined facts are removed so they cannot be used as support.
     p["coverage"]=[copy.deepcopy(cov[r["id"]]) for r in retained if r["id"] in cov]
     for c in p["coverage"]:
         c["fact_ids"]=[fid for fid in c["fact_ids"] if fid in allowed_facts]
-        if c["status"]=="supported" and not c["fact_ids"]:
+        if c["status"] in ("supported","partial") and not c["fact_ids"]:
             c.update(status="not_found",reason="关联事实已被舍弃或隔离；不构成当前执行依据")
     active_conflicts=[]
     for conflict in p.get("conflicts",[]):
@@ -213,7 +213,7 @@ def evaluate(t,omitted,dropped):
         blockers.append(dict(code="active_conflict",reason="保留范围仍存在未解决冲突",waivable=False))
     product_ids={r["id"] for r in view["brief_analysis"]["retrieval_plan"]["facts"] if ep.request_kind(r)=="product" and r.get("guardrail","none")!="identity"}
     valid_product_facts={f["id"] for f in view["package"]["facts"] if f.get("category","product")=="product" and ep.commercial_kind(f["claim"]+" "+f["quote"]) is None}
-    has_product=any(c["request_id"] in product_ids and c["status"]=="supported" and set(c["fact_ids"])&valid_product_facts for c in view["package"]["coverage"])
+    has_product=any(c["request_id"] in product_ids and c["status"] in ("supported","partial") and set(c["fact_ids"])&valid_product_facts for c in view["package"]["coverage"])
     if not view["brief_analysis"]["message_strategy"]["priorities"] or not has_product:
         blockers.append(dict(code="empty_content",reason="剩余方向没有可用的产品事实，不能生成空内容或仅价格促销",waivable=False))
     images=[im for im in p.get("asset_candidates",p.get("images",[])) if im.get("model_verified") and im.get("usable",True) and image_allowed(t,im,prohibited_topics(t,omitted))]
@@ -378,4 +378,4 @@ def review_summary(t):
             target_model=t["brief_analysis"]["product_resolution"]["product_model"]) for u in unmet],
         refresh=dict(method="POST",path=f"/api/tasks/{t['id']}/refresh-evidence",body=dict(version=t["version"]),
             description="更新任务原资料源后主动刷新目录、原文、图片及覆盖；保留历史与已授权取舍。无任务级上传。"),
-        actions=["adjust_content","refresh_evidence","modify_requirements"])
+        actions=["adjust_content","refresh_evidence","manual_evidence","modify_requirements"])

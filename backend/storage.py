@@ -65,6 +65,7 @@ def snapshot(tid, version):
 
 def digest(t):
     data={k:t.get(k) for k in ("product_id","brief","package","plan","document")}
+    if t.get("manual_evidence"):data["manual_evidence"]=t["manual_evidence"]
     if t.get("execution_scope"):data["execution_scope"]=t["execution_scope"]
     if t.get("user_image_overrides"):data["user_image_overrides"]=t["user_image_overrides"]
     if t.get("brief_analysis"):

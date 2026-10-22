@@ -12,7 +12,7 @@ async function setup(page:Page, options:{ack?:boolean;block?:boolean;protected?:
   task.brief_analysis!.message_strategy!.priorities=[{id:'d1',direction:'续航表现',reason:'模拟'},{id:'d2',direction:'轻便',reason:'模拟'},{id:'d3',direction:'轻便与续航兼顾',reason:'模拟'}];
   task.package!.coverage=[{request_id:'r1',status:'not_found',fact_ids:[],reason:'没有续航时长及测试条件'},{request_id:'r2',status:'supported',fact_ids:['fact-1'],reason:'有重量依据'}];
   const blocked={code:'missing',reason:'续航缺少官方测试条件',request_id:'r1',waivable:!options.protected};
-  const summary:ReviewOverview={version:10,knowledge_source:options.ima?'ima':'local_zip',local_archive_path:options.ima?null:'D:/fixtures/knowledge.zip',actions:['adjust_content','refresh_evidence','modify_requirements'],task_upload_supported:false,unmet_requirements:[{request,coverage:task.package!.coverage[0],found:[],missing:'没有续航时长及测试条件',affected_direction_ids:['d1','d3'],blocking:true,omitted:false,can_drop:!options.protected,non_waivable_reason:options.protected?'必要兼容条件不能跳过':null}],available_facts:task.package!.facts,blockers:[blocked],material_requirements:[{request_id:'r1',question:request.question,target_model:'测试型号',conditions:['同一配置及测试场景'],document_types:['官方续航测试说明']}]};
+  const summary:ReviewOverview={version:10,knowledge_source:options.ima?'ima':'local_zip',local_archive_path:options.ima?null:'D:/fixtures/knowledge.zip',actions:['adjust_content','refresh_evidence','manual_evidence','modify_requirements'],task_upload_supported:false,unmet_requirements:[{request,coverage:task.package!.coverage[0],found:[],missing:'没有续航时长及测试条件',affected_direction_ids:['d1','d3'],blocking:true,omitted:false,can_drop:!options.protected,non_waivable_reason:options.protected?'必要兼容条件不能跳过':null}],available_facts:task.package!.facts,blockers:[blocked],material_requirements:[{request_id:'r1',question:request.question,target_model:'测试型号',conditions:['同一配置及测试场景'],document_types:['官方续航测试说明']}]};
   const preview:ResolutionPreview={task_id:task.id,version:10,preview_id:'preview-test-10',selected_request_ids:['r1'],selected_direction_ids:[],removed:[{request,coverage:task.package!.coverage[0]},{request:linked,coverage:null}],affected_directions:[{direction:{id:'d3',direction:'轻便与续航兼顾'},request_ids:['r3'],reason:'依赖续航证据'}],retained:[{request:keep,coverage:task.package!.coverage[1]}],retained_fact_ids:['fact-1'],excluded_fact_ids:[],excluded_image_ids:['fixture-image-4'],remaining_blockers:options.block?[{code:'image_shortage',reason:'现有图片不足，请补充图片',waivable:false}]:[],required_constraint_acks:options.ack?[{id:'c1',request_id:'r1',description:'本次不写续航',requires_ack:true,evidence:[{turn_id:'u1',quote:'没有续航数据就不生成'}]}]:[],prohibited_topic_labels:['续航表现'],can_apply:!options.block,requires_asset_review:false};
   const state=await mockApi(page,task);
   const local={summary,preview,calls:[] as {path:string;body:any}[],preview409:!!options.preview409,overviewFailure:!!options.overviewFailure,confirmFailure:0,refreshPaused:false};
@@ -126,4 +126,51 @@ test('adjust content button explains missing selection without sending a request
  await page.getByRole('button',{name:'调整内容，继续创作',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'请先勾选本次不写的内容，再查看取舍影响。'})).toBeVisible();
  expect(local.calls).toHaveLength(0);
+});
+
+const manualText='测试型号的隔离资料：对应具体配置与测试条件，原文记录课堂播放场景及测试方法。本段为自动化测试夹具，不代表真实产品性能。';
+async function fillManual(page:Page){
+ await page.getByRole('button',{name:'补充依据，再检查'}).click();
+ await page.getByRole('button',{name:'手动补充原文',exact:true}).click();
+ const form=page.getByRole('region',{name:'手动补充文字依据'});
+ await form.getByRole('checkbox',{name:'续航是否满足课程需求？',exact:true}).check();
+ await form.getByLabel('资料原文',{exact:true}).fill(manualText);
+ await form.getByLabel('来源链接',{exact:true}).fill('https://example.com/specs');
+ await form.getByRole('checkbox',{name:'我确认原文与来源对应，同意将其保存到当前任务并重新检查'}).check();
+ return form;
+}
+test('manual excerpt is separate from ZIP refresh and requires traceable input',async({page})=>{
+ const {local}=await setup(page);let submitted:any=null;
+ await page.route('**/manual-evidence',async route=>{submitted=route.request().postDataJSON();await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({detail:'模拟：资料仍需检查'})});});
+ const form=await fillManual(page);
+ await expect(form).toContainText('链接仅用于追溯');
+ await form.getByRole('button',{name:'提交原文，重新检查'}).click();
+ await expect(page.getByText('操作未完成，选择和输入已保留。',{exact:false})).toBeVisible();
+ expect(submitted).toMatchObject({version:10,product_id:'fixture-product',request_ids:['r1'],text:manualText,source_url:'https://example.com/specs',confirmed:true});
+ expect(local.calls).toHaveLength(0);
+ await expect(form.getByLabel('资料原文',{exact:true})).toHaveValue(manualText);
+});
+test('invalid manual source and unconfirmed input cannot submit',async({page})=>{
+ await setup(page);const form=await fillManual(page),button=form.getByRole('button',{name:'提交原文，重新检查'});
+ await form.getByLabel('来源链接',{exact:true}).fill('javascript:alert(1)');await expect(button).toBeDisabled();
+ await form.getByLabel('来源链接',{exact:true}).fill('https://example.com/specs');
+ await expect(button).toBeDisabled();
+ await form.getByRole('checkbox',{name:'我确认原文与来源对应，同意将其保存到当前任务并重新检查'}).check();await expect(button).toBeEnabled();
+});
+test('manual supplement keyboard form remains accessible on mobile',async({page})=>{
+ await page.setViewportSize({width:390,height:900});await setup(page);await fillManual(page);
+ const results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();expect(results.violations).toEqual([]);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ await page.screenshot({path:'qa/screenshots/manual-evidence-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'qa/screenshots/manual-evidence-desktop.png',fullPage:true});
+});
+
+test('partial coverage keeps actual facts visible without pretending full support',async({page})=>{
+ const t=makeTask('approved');t.package!.coverage=[{request_id:'r-partial',status:'partial',fact_ids:['fact-1'],reason:'容量与视频播放数据有原文，额外脚注尚未明确',missing_details:['亮度与视频类型未提供'],usage_limits:['不能改写为办公18小时']}];
+ await mockApi(page,t);await page.goto('/');
+ await page.getByRole('button',{name:'知识库依据',exact:true}).click();
+ await page.getByText('检索结果与内容取舍（1 项）',{exact:true}).click();
+ await expect(page.getByText('部分有依据，可按已有事实使用',{exact:false})).toBeVisible();
+ await expect(page.getByText('尚未明确：亮度与视频类型未提供',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'查看依据 fact-1',exact:true})).toBeVisible();
 });

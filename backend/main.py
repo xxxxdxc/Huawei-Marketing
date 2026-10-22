@@ -125,10 +125,10 @@ def begin(tid,body,states,operation,bg,update=None):
         t=db.get(tid);w.require(t,states)
         if t["version"]!=body.version:raise ValueError("任务已更新，请刷新后重试")
         if update:update(t)
-        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","replan":"plan_ready","replan_points":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review"}[operation]
-        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","replan":"planning","replan_points":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving"}[operation]
+        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","replan":"plan_ready","replan_points":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review","manual_evidence":"needs_review"}[operation]
+        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","replan":"planning","replan_points":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving","manual_evidence":"retrieving"}[operation]
         t["error"]=None;t["review"]=None
-        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认卖点或历史规划，开始编排并写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","replan":"仅切换平台，复用需求与核心策略，重新规划","replan_points":"保存卖点选择，原版本暂时保留","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查"}[operation],body.version)
+        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认卖点或历史规划，开始编排并写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","replan":"仅切换平台，复用需求与核心策略，重新规划","replan_points":"保存卖点选择，原版本暂时保留","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查","manual_evidence":"用户提交手动原文与来源链接，重新检查"}[operation],body.version)
         bg.add_task(w.job,tid,operation)
         return {"accepted":True,"task_id":tid}
 
@@ -191,6 +191,8 @@ def resume_plan(tid:str,body:S.Versioned,bg:BackgroundTasks):
         ba.assert_confirmed(t)
         if t.get("plan") or t.get("document") or not t.get("package") or not t["package"].get("coverage"):
             raise ValueError("只可恢复已有检索资料但尚无规划和文稿的任务")
+        if t.get('manual_evidence'):
+            t.setdefault('evidence_refreshes',[]).append(dict(kind='saved_manual_recheck',requested_at=db.now(),authorized_version=t['version']+1))
     return begin(tid,body,{"needs_review"},"resume_plan",bg,update)
 
 @app.put("/api/tasks/{tid}/plan")
@@ -250,6 +252,12 @@ def preview_evidence_resolution(tid:str,body:S.EvidenceResolutionPreview):
 @app.post("/api/tasks/{tid}/evidence-resolution/confirm",status_code=202)
 def confirm_evidence_resolution(tid:str,body:S.EvidenceResolutionConfirm,bg:BackgroundTasks):
     return begin(tid,body,{"needs_review","plan_ready"},"resolve_evidence",bg,lambda t:er.confirm(t,body))
+
+
+@app.post("/api/tasks/{tid}/manual-evidence",status_code=202)
+def add_manual_evidence(tid:str,body:S.ManualEvidenceInput,bg:BackgroundTasks):
+    return begin(tid,body,{"plan_ready","needs_review","approved"},"manual_evidence",bg,
+                 lambda t:w.me.prepare(t,body))
 
 
 @app.post("/api/tasks/{tid}/refresh-evidence",status_code=202)
