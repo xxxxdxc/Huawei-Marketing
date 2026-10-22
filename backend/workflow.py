@@ -1,11 +1,11 @@
 import copy, hashlib, json, re
-from . import schemas as S, storage as db, brief_agent as ba, evidence_policy as ep
+from . import schemas as S, storage as db, brief_agent as ba, evidence_policy as ep, prewrite_recovery as pr
 from .clients import llm, ServiceError, compact
 from .knowledge import knowledge as ima
 from .settings import get_settings, ASSETS
 from . import vmall, evidence_resolution as er, content_planner as cp, platform_writer as pw
 from .content_layout import effective_layout,validate_layout
-from . import publication_rules as pub,store_marketing as sm,numeric_evidence as ne,review_guard as rg,manual_evidence as me
+from . import publication_rules as pub,store_marketing as sm,numeric_evidence as ne,review_guard as rg,manual_evidence as me,quote_evidence as qe
 
 PLATFORMS={
  "xiaohongshu":dict(name="小红书",min_images=1,max_images=None,recommended_images=[3,6],image_count_note="至少1张；推荐3–6张，仅作建议，不因少于3张或多于6张暂停、补图或删图",words="300—500字",style="口语化标题、短段落、具体场景、话题标签；不得伪造第一人称体验"),
@@ -20,8 +20,16 @@ def event(t,note):
     t["events"]=t["events"][-60:]
     return db.save(t,note)
 
+def failed_planner(t):
+    return bool(t.get("status")=="error" and (t.get("package") or {}).get("coverage")
+        and not t.get("plan") and not t.get("document")
+        and re.search(r"候选卖点|卖点候选|规划结果|内容规划|Content Planner",t.get("error") or "",re.I)
+        and t.get("planner_runs") and t["planner_runs"][-1].get("status")=="failed")
+
+
 def current(t):
     if t["status"]!="error":return t["status"]
+    if pr.info(t) or failed_planner(t):return "needs_review"
     if t.get("document") and t.get("plan"):
         # Legacy records used plan_ready even after a reviewer failure.
         latest=next((e["text"] for e in reversed(t.get("events",[])) if not e["text"].startswith("处理已暂停：")), "")
@@ -174,8 +182,36 @@ async def analyze(t):
 def verify_coverage(t):
     return er.apply(t)
 
+def source_views(sources):
+    # Preserve raw JSON in the task audit, not as a second copy in model context.
+    fields={'id','title','text','path','url','source_url','source_type','knowledge_source','sku','retrieved_at','link_verified'}
+    return [{k:v for k,v in source.items() if k in fields} for source in sources]
+
+
 async def extract_facts(t):
-    return await llm.complete(get_settings()["writer_model"],BASE+"提取与用户策略相关的事实，最多8条；没有相关证据时返回空列表，不能凑数。每条 quote 必须逐字摘录某一个 source 的连续原文，保留约、最高、配置差异及使用条件，不得拼接不相邻句子。source_id必须存在。id使用F01等。若发现同一型号同一配置同一条件的事实冲突，写入conflicts；不同配置的差异不算冲突。若输入含retrieval_plan，必须逐项给出coverage，引用真实事实编号；复合问题部分有依据时标partial并列出已有fact_ids、missing_details与usage_limits，不因未回答所有脚注而清空已有事实；无证据、空模板、下架无价格、快照无法回答当前报价均标not_found，冲突标conflict，不能拿不相关事实充当支持。每条事实必须分类category=product/price/promotion；分别摘录，产品事实的quote不要夹带价格。冲突必须结构化填写category/request_ids/source_ids/detail，产品参数冲突不能标为价格冲突；不同配置或不同快照时间的正常差异不算冲突。公开快照仅能支持带配置、时间、渠道、资格条件的快照描述，不能当今天的门店到手价。",dict(brief=ba.context(dict(t,execution_scope=None)),product=t["package"]["product"],sources=t["package"]["sources"]),S.RetrievalFacts if t.get("brief_analysis") else S.Facts)
+    return await llm.complete(get_settings()["writer_model"],BASE+"提取与用户策略相关的事实，最多8条；没有相关证据时返回空列表，不能凑数。每条 quote 必须逐字摘录某一个 source 的连续原文，保留约、最高、配置差异及使用条件，不得拼接不相邻句子。source_id必须存在。id使用F01等。若发现同一型号同一配置同一条件的事实冲突，写入conflicts；不同配置的差异不算冲突。若输入含retrieval_plan，必须逐项给出coverage，引用真实事实编号；复合问题部分有依据时标partial并列出已有fact_ids、missing_details与usage_limits，不因未回答所有脚注而清空已有事实；无证据、空模板、下架无价格、快照无法回答当前报价均标not_found，冲突标conflict，不能拿不相关事实充当支持。每条事实必须分类category=product/price/promotion；分别摘录，产品事实的quote不要夹带价格。冲突必须结构化填写category/request_ids/source_ids/detail，产品参数冲突不能标为价格冲突；不同配置或不同快照时间的正常差异不算冲突。公开快照仅能支持带配置、时间、渠道、资格条件的快照描述，不能当今天的门店到手价。",dict(brief=ba.context(dict(t,execution_scope=None)),product=t["package"]["product"],sources=source_views(t["package"]["sources"])),S.RetrievalFacts if t.get("brief_analysis") else S.Facts)
+
+
+async def extract_into_package(t):
+    raw=await extract_facts(t)
+    t["package"].update(raw)
+    await reconcile_extracted(t)
+    return {k:t["package"].get(k,[]) for k in raw}
+
+
+async def reconcile_extracted(t,allow_retry=True):
+    p=t['package'];original_coverage=copy.deepcopy(p.get('coverage',[]));rejected=qe.reconcile(p)
+    if rejected and allow_retry and not p.get("conflicts"):
+        ids={x['fact']['id'] for x in rejected}
+        try:
+            corrected=await llm.complete(get_settings()['writer_model'],BASE+"只纠正输入中无法定位的事实卡。只返回原问题卡ID；quote必须是一个source.text中的连续原文，不能改数字、拼句或编造。无依据的卡不返回，不补新卖点。",dict(product=p['product'],sources=source_views(p['sources']),problem_facts=rejected),qe.FactCorrections)
+            if len({f['id'] for f in corrected['facts']})!=len(corrected['facts']) or any(f['id'] not in ids for f in corrected['facts']):raise ServiceError('纠正结果改变了事实编号范围')
+            candidate=copy.deepcopy(p);candidate['facts'].extend(corrected['facts']);candidate['coverage']=original_coverage;qe.reconcile(candidate)
+            p.update(candidate)
+        except (ServiceError,ValueError):
+            p.setdefault('extraction_notices',[]).append('部分摘录纠正未完成，已保留可定位事实，问题卡仅供工作人员查看。')
+    verify_facts(p)
+    return p
 
 
 async def select_images(t, reuse_checked=False, allow_empty=False):
@@ -220,9 +256,23 @@ async def select_images(t, reuse_checked=False, allow_empty=False):
     if not t["package"]["images"] and not allow_empty:raise ServiceError("图片画面检查未找到适用素材，已停止规划")
 
 
+async def prewrite_step(t,stage,operation):
+    pr.start(t,stage)
+    t["status"]="retrieving" if stage in ("source_retrieval","fact_extraction") else "planning"
+    event(t,"开始"+pr.LABELS[stage]+"；发生临时失败时可从本步骤恢复")
+    try:result=await operation()
+    except Exception:
+        pr.finish(t,failed=True)
+        raise
+    pr.finish(t)
+    return result
+
+
 async def build_content_plan(t, enforce_count=False):
     policy=PLATFORMS[t["brief"]["platform"]]
-    t['plan']=await cp.generate(t,policy,BASE)
+    t["status"]="planning";t["resume_status"]="needs_review"
+    event(t,"资料已就绪，正在生成候选卖点；失败时可复用资料重试")
+    t['plan']=await prewrite_step(t,'selling_points',lambda:cp.generate(t,policy,BASE))
     t["selection_confirmation"]=None;t["writer_outline"]=None;t["writer_stage"]=None
     validate_plan(t,t['plan'],True)
     t["status"]="plan_ready";t["resume_status"]="plan_ready";t["document"]=None;t["review"]=None;t["error"]=None
@@ -232,8 +282,15 @@ async def build_content_plan(t, enforce_count=False):
 
 async def plan(t, reuse_package=False, refresh_source=False):
     ba.assert_confirmed(t)
+    if reuse_package and t.pop("pending_planner_retry",False):
+        cp.check_input(t)
+        await build_content_plan(t)
+        return
     if reuse_package and t.get("manual_evidence"):
         await me.run(t,reuse_facts=True);return
+    if not reuse_package:
+        pr.start(t,"source_retrieval")
+        event(t,"开始资料读取；发生临时失败时可从本步骤恢复")
     products=await ima.catalog_for_task(t,verify_snapshot=not refresh_source,refresh=refresh_source);prod=next((p for p in products if p["id"]==t["product_id"]),None)
     if not prod:raise ServiceError("产品已不可用，请重新选择")
     t["user_image_overrides"]={}
@@ -250,9 +307,69 @@ async def plan(t, reuse_package=False, refresh_source=False):
         t["package"]=await ima.retrieve_for_task(t,prod,ba.context(dict(t,execution_scope=None)) | ({"_refresh_assets":True} if refresh_source else {}))
         event(t,"已从本地 ZIP 读取指定型号原文与图片；已执行本地检索与目录核对" if t.get("knowledge_source")=="local_zip" else "已从 ima 读取指定型号原文与图片；已执行搜索及目录回退检查")
         me.attach(t,t["package"])
-        raw=await extract_facts(t)
-        t["package"].update(raw);verify_facts(t["package"])
+        pr.finish(t)
+        raw=await prewrite_step(t,"fact_extraction",lambda:extract_into_package(t))
         t["package"]["asset_candidates"]=copy.deepcopy(t["package"]["images"])
+    await finish_prewrite(t,raw)
+
+
+async def supplement_evidence(t,need_facts,minimum_images):
+    """Merge only newly fetched official evidence; original fact IDs remain stable."""
+    p=t['package']
+    try:
+        result=await vmall.supplement(t,need_facts=need_facts,minimum_images=minimum_images)
+        p.setdefault('supplement_attempts',[]).append(result['audit'])
+        current={s['id'] for s in p['sources']}
+        new_sources=[s for s in result['sources'] if s['id'] not in current]
+        p['sources'].extend(new_sources)
+        known={i['id'] for i in p['images']}
+        p['images'].extend(i for i in result['images'] if i['id'] not in known)
+        if new_sources:
+            work=copy.deepcopy(t);wp=work['package'];wp.update(sources=new_sources,facts=[],coverage=[],conflicts=[])
+            wp.pop('all_facts',None);wp.pop('all_conflicts',None)
+            await extract_into_package(work)
+            oldfacts=copy.deepcopy(p.get('all_facts',p['facts']));ids={f['id'] for f in oldfacts};mapping={}
+            for fact in wp['facts']:
+                original=fact['id'];existing=next((f for f in oldfacts if all(f.get(k)==fact.get(k) for k in ('source_id','quote','claim','conditions'))),None)
+                if existing:mapping[original]=existing['id'];continue
+                fid='VM'+hashlib.sha256((fact['source_id']+fact['quote']+fact['claim']).encode()).hexdigest()[:16]
+                if fid in ids:raise ServiceError('商城补充事实编号冲突，保留原资料')
+                mapping[original]=fid;fact=copy.deepcopy(fact);fact['id']=fid;oldfacts.append(fact);ids.add(fid)
+            rows={c['request_id']:copy.deepcopy(c) for c in p.get('coverage',[])}
+            for row in wp.get('coverage',[]):
+                row=copy.deepcopy(row);row['fact_ids']=[mapping[x] for x in row['fact_ids'] if x in mapping]
+                old=rows.get(row['request_id'])
+                if not old:rows[row['request_id']]=row;continue
+                refs=list(dict.fromkeys(old['fact_ids']+row['fact_ids']))
+                if old['status']=='conflict' or row['status']=='conflict':state='conflict'
+                elif 'supported' in (old['status'],row['status']):state='supported'
+                elif refs:state='partial'
+                else:state='not_found'
+                merged=dict(old,status=state,fact_ids=refs,reason=old['reason']+'；商城补充：'+row['reason'])
+                if state=='supported':merged.pop('missing_details',None);merged.pop('usage_limits',None)
+                else:
+                    for key in ('missing_details','usage_limits'):merged[key]=list(dict.fromkeys(old.get(key,[])+row.get(key,[])))
+                rows[row['request_id']]=merged
+            p.update(facts=oldfacts,coverage=list(rows.values()))
+            p['conflicts']=copy.deepcopy(p.get('all_conflicts',p.get('conflicts',[])))+wp.get('conflicts',[])
+            p.pop('all_facts',None);p.pop('all_conflicts',None)
+            for key in ('quote_repairs','rejected_facts'):
+                if wp.get(key):p.setdefault(key,[]).extend(wp[key])
+            verify_facts(p)
+        event(t,'已从华为商城增量补充资料；原事实编号保留，新增图片仍需画面核验')
+        return True
+    except (ServiceError,ValueError) as exc:
+        p.setdefault('supplement_attempts',[]).append(dict(source='vmall',at=db.now(),status='unavailable',detail=str(exc)[:400]))
+        event(t,'华为商城补充未完成，保留已有有效资料：'+str(exc)[:250])
+        return False
+
+
+async def finish_prewrite(t,raw,reuse_images=False):
+    p=t['package'];minimum=PLATFORMS[t['platform']]['min_images']
+    need_facts=not p.get('facts') or any(c['status']!='supported' for c in p.get('coverage',[]))
+    attempted=need_facts or len(p.get('images',[]))<minimum
+    if attempted:
+        await supplement_evidence(t,need_facts,minimum if len(p.get('images',[]))<minimum else 0)
     if t.get("brief_analysis"):
         gaps=verify_coverage(t)
         t["package"]["evidence_gaps"]=gaps
@@ -266,8 +383,40 @@ async def plan(t, reuse_package=False, refresh_source=False):
         t["status"]="needs_review";t["error"]="资料存在冲突，请核对具体型号/版本或在 ima 确认资料更新后重新检索。";event(t,"资料冲突，已暂停写作");return
     raw["facts"]=t["package"]["facts"]
     event(t,"已保存本轮可用事实与覆盖检查结果，继续核对图片")
-    await select_images(t)
+    await prewrite_step(t,"image_review",lambda:select_images(t,reuse_checked=reuse_images,allow_empty=True))
+    if len(p['images'])<minimum and not attempted:
+        await supplement_evidence(t,False,minimum)
+        await prewrite_step(t,'image_review',lambda:select_images(t,reuse_checked=True,allow_empty=True))
+    if len(p['images'])<minimum:
+        t.update(status='needs_review',resume_status='needs_review',error=f"已核验图片不足{minimum}张，商城补充后仍不足，请补充图片；有效事实已保留。")
+        event(t,t['error']);return
+    if not p['facts']:
+        t.update(status='needs_review',resume_status='needs_review',error='没有可引用的产品事实，已尝试商城补充，请补充相关资料。')
+        event(t,t['error']);return
     await build_content_plan(t)
+
+
+async def retry_prewrite(t):
+    stage=t.pop("pending_prewrite_retry")
+    pr.assert_current(t,stage)
+    if stage=="source_retrieval":
+        await plan(t)
+        return
+    if stage=="selling_points":
+        cp.check_input(t)
+        await build_content_plan(t)
+        return
+    if t["package"]["product"]["id"]!=t["product_id"]:raise ValueError("已保存资料型号不一致")
+    if stage=="fact_extraction":
+        if t['package'].get('facts') and t['package'].get('coverage'):
+            await reconcile_extracted(t)
+            raw={k:t['package'].get(k,[]) for k in ('facts','conflicts','coverage')}
+        else:raw=await prewrite_step(t,stage,lambda:extract_into_package(t))
+        t["package"]["asset_candidates"]=copy.deepcopy(t["package"]["images"])
+    else:
+        verify_facts(t["package"])
+        raw={k:t["package"].get(k,[]) for k in ("facts","conflicts","coverage")}
+    await finish_prewrite(t,raw,reuse_images=True)
 
 
 
@@ -303,26 +452,7 @@ async def replan(t):
     async def supplement(need_facts):
         nonlocal attempted
         attempted=True
-        try:
-            result=await vmall.supplement(t,need_facts=need_facts,minimum_images=minimum)
-            p.setdefault("supplement_attempts",[]).append(result["audit"])
-            existing_sources={x["id"] for x in p["sources"]}
-            p["sources"].extend(x for x in result["sources"] if x["id"] not in existing_sources)
-            existing_images={x["id"] for x in p["images"]}
-            p["images"].extend(x for x in result["images"] if x["id"] not in existing_images)
-            if result["sources"]:
-                # Re-extract against all original and supplemental evidence; stable original IDs.
-                extracted=await extract_facts(t)
-                candidate=copy.deepcopy(p);candidate.update(extracted)
-                verify_facts(candidate)
-                # Validate coverage before replacing cached, usable original facts.
-                ep.apply(dict(t,package=candidate))
-                p.update(extracted)
-                p.pop("all_facts",None);p.pop("all_conflicts",None)
-            event(t,"已尝试从华为商城补充材料；新增内容仍需核验")
-        except ServiceError as exc:
-            p.setdefault("supplement_attempts",[]).append(dict(source="vmall",at=db.now(),status="unavailable",detail=str(exc)))
-            event(t,"华为商城补充未完成："+str(exc))
+        await supplement_evidence(t,need_facts,minimum)
 
     evidence_incomplete=bool(gaps or p.get("conflicts") or any(c["status"]!="supported" for c in p.get("execution_coverage",p.get("coverage",[]))))
     if evidence_incomplete or len(p["images"])<minimum:
@@ -355,7 +485,7 @@ async def replan(t):
             raise ValueError('原选中卖点的事实依据已变化，请重新检查资料并确认卖点')
         old=saved['plan'];fields=set(cp.P.SellingPoint.model_fields)
         raw=[{k:v for k,v in c.items() if k in fields} for c in old['planning_analysis']['candidates']]
-        candidates=cp.rank_candidates(t,dict(product_id=t['product_id'],candidates=raw))
+        candidates=cp.rank_candidates(t,dict(product_id=t['product_id'],candidates=raw),enriched=True)
         t['plan']=cp.selection_plan(t,candidates,old['selected_point_ids'])
         t['document']=None;t['review']=None;t['error']=None
         if saved['confirmed']:
@@ -518,6 +648,7 @@ async def job(tid, operation):
         if operation=="analyze":await analyze(t)
         elif operation=="plan":await plan(t)
         elif operation=="resume_plan":await plan(t,reuse_package=True)
+        elif operation=="retry_prewrite":await retry_prewrite(t)
         elif operation=="replan":await replan(t)
         elif operation=="replan_points":await replan_points(t)
         elif operation=="resolve_evidence":await resolve_evidence(t)
@@ -528,6 +659,7 @@ async def job(tid, operation):
     except Exception as e:
         # Preserve failed Writer stage metadata and intermediate work from this job.
         if "t" not in locals():t=db.get(tid)
+        pr.finish(t,failed=True)
         t["status"]="error"
         t["error"]=str(e)[:400] if isinstance(e,(ServiceError,ValueError)) else "处理失败，当前资料和稿件已保留，请重试或检查连接。"
         event(t,"处理已暂停："+t["error"])

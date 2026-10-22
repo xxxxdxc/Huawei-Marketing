@@ -131,8 +131,8 @@ class PlatformChangeTests(unittest.TestCase):
         self.assertIn("Asset Selector",model.call_args_list[0].args[1])
         self.assertTrue(any(i["id"]==extra["id"] and i["visual_checked"] for i in u["package"]["images"]))
 
-    def test_product_evidence_gap_cannot_be_bypassed(self):
-        t=task();t["package"]["coverage"][0].update(status="not_found",fact_ids=[]);db.save(t,"缺少产品事实")
+    def test_identity_evidence_gap_cannot_be_bypassed(self):
+        t=task();t['brief_analysis']['retrieval_plan']['facts'][0]['guardrail']='identity';t['brief_confirmation']['analysis_hash']=ba.digest(t['brief_analysis']);t["package"]["coverage"][0].update(status="not_found",fact_ids=[]);db.save(t,"缺少产品事实")
         with patch.object(vmall,"supplement",AsyncMock(return_value=empty_supplement())),patch.object(w.llm,"complete",AsyncMock()) as model:
             self.client.post(f"/api/tasks/{t['id']}/change-platform",json=dict(version=t["version"],platform="wechat"))
         self.assertEqual(db.get(t["id"])["status"],"needs_review");model.assert_not_called()
@@ -212,7 +212,7 @@ class PlatformChangeTests(unittest.TestCase):
         with patch.object(vmall,"supplement",AsyncMock(return_value=result)),patch.object(w.llm,"complete",AsyncMock(side_effect=[extracted,plan])) as model:
             self.client.post(f"/api/tasks/{t['id']}/change-platform",json=dict(version=t["version"],platform="wechat"))
         u=db.get(t["id"]);self.assertEqual(u["status"],"plan_ready");self.assertEqual(model.call_count,2)
-        self.assertEqual(u["package"]["facts"][0]["source_id"],"V1")
+        self.assertEqual(u["package"]["facts"][0]["source_id"],"S1");self.assertTrue(any(f['source_id']=='V1' and f['id'].startswith('VM') for f in u['package']['facts']))
         self.assertEqual(u["package"]["sources"][0]["id"],"S1")
 
     def test_conflicting_vmall_product_fact_is_not_preferred_over_original(self):
@@ -252,7 +252,7 @@ class PlatformChangeTests(unittest.TestCase):
             conflicts=[],coverage=[dict(request_id="R1",status="supported",fact_ids=["F02"],reason="错误支持")])
         with patch.object(vmall,"supplement",AsyncMock(return_value=result)),patch.object(w.llm,"complete",AsyncMock(return_value=bad)):
             self.client.post(f"/api/tasks/{t['id']}/change-platform",json=dict(version=t["version"],platform="wechat"))
-        u=db.get(t["id"]);self.assertEqual(u["status"],"needs_review");self.assertEqual(u["package"]["facts"],original)
+        u=db.get(t["id"]);self.assertEqual(u["status"],"plan_ready");self.assertEqual(u["package"]["facts"],original);self.assertTrue(u['package'].get('rejected_facts'))
 
 
 class VmallBoundaryTests(unittest.TestCase):

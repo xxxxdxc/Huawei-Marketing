@@ -212,10 +212,16 @@ class LLM:
                 try:res=await c.post(s["base_url"].rstrip("/")+"/chat/completions",headers={"Authorization":"Bearer "+key},json=body)
                 except httpx.TimeoutException:
                     if usage_capture.get() is not None:usage_capture.get().append(dict(model=model,schema=schema.__name__,attempt=attempt+1,error='timeout',elapsed_seconds=time.perf_counter()-started))
-                    raise ServiceError("模型响应超时，请保留当前任务后重试")
+                    if attempt==0:
+                        await asyncio.sleep(1)
+                        continue
+                    raise ServiceError("模型响应超时；已自动重试一次，仍未完成。已保留进度，请重试当前步骤。")
                 except httpx.HTTPError:
                     if usage_capture.get() is not None:usage_capture.get().append(dict(model=model,schema=schema.__name__,attempt=attempt+1,error='network',elapsed_seconds=time.perf_counter()-started))
-                    raise ServiceError("无法连接模型服务，请检查 API 地址和网络")
+                    if attempt==0:
+                        await asyncio.sleep(1)
+                        continue
+                    raise ServiceError("模型服务连接中断；已自动重试一次。已保留进度，请检查连接后重试当前步骤。")
                 capture=usage_capture.get()
                 if capture is not None:
                     record=dict(model=model,schema=schema.__name__,attempt=attempt+1,http_status=res.status_code,elapsed_seconds=time.perf_counter()-started,max_tokens=body['max_tokens'])
@@ -233,7 +239,12 @@ class LLM:
                     if error_code in ("pre_consume_token_quota_failed","insufficient_quota","insufficient_balance"):
                         label="核验" if selected_role=="reviewer" else "写作"
                         raise ServiceError(label+"模型 API 预扣额度不足，请检查该密钥额度或更换可用密钥后重试；已有稿件和资料已保留。")
-                    raise ServiceError(f"模型服务返回 HTTP {res.status_code}，请检查模型权限、余额和接口兼容性")
+                    if res.status_code in (408,500,502,503,504,520,522,523,524):
+                        if attempt==0:
+                            await asyncio.sleep(1)
+                            continue
+                        raise ServiceError(f"模型网关或上游服务暂时未完成响应（HTTP {res.status_code}）；已自动重试一次，进度已保存，请重试当前步骤。")
+                    raise ServiceError(f"模型服务返回 HTTP {res.status_code}，请检查模型权限或接口配置；当前进度已保留。")
                 try:
                     try:data=res.json()
                     except ValueError as exc:raise mo.InvalidOutput("envelope","模型服务没有返回 JSON") from exc

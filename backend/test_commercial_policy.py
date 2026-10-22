@@ -153,6 +153,41 @@ class CommercialPolicyTests(unittest.TestCase):
             r=self.client.post(f"/api/tasks/{t['id']}/resume-plan",json=dict(version=t["version"]))
         self.assertEqual(r.status_code,202);retrieve.assert_not_awaited();self.assertEqual(model.await_count,2)
         u=db.get(t["id"]);self.assertEqual(u["status"],"plan_ready");ba.assert_confirmed(u)
+    def test_legacy_planner_failure_retries_only_candidates(self):
+        t=self.ready();t['package']=priced(t);w.verify_coverage(t)
+        t['package']['images'][0].update(usable=True,visual_checked=True,model_verified=True)
+        t.update(plan=None,document=None,status='error',resume_status='brief_ready',
+            error='候选卖点策划失败：模型返回格式不符',planner_runs=[dict(status='failed')])
+        t['brief_confirmation']={'analysis_hash':ba.digest(t['brief_analysis'])};t=db.save(t,'fixture failed planner')
+        original=copy.deepcopy(t['package']);confirmation=copy.deepcopy(t['brief_confirmation'])
+        with patch.object(w.ima,'catalog_for_task',AsyncMock(side_effect=AssertionError('must not catalog'))),patch.object(w,'extract_facts',AsyncMock(side_effect=AssertionError('must not extract'))),patch.object(w,'select_images',AsyncMock(side_effect=AssertionError('must not select assets'))),patch.object(w.llm,'complete',AsyncMock(return_value=copy.deepcopy(PLAN))) as model:
+            r=self.client.post(f"/api/tasks/{t['id']}/resume-plan",json=dict(version=t['version']))
+        self.assertEqual(r.status_code,202);self.assertEqual(model.await_count,1)
+        from backend.planner_schemas import CandidateBatch
+        self.assertIs(model.call_args.args[3],CandidateBatch)
+        result=db.get(t['id']);self.assertEqual(result['status'],'plan_ready');self.assertIsNone(result['document'])
+        self.assertEqual(result['package'],original);self.assertEqual(result['brief_confirmation'],confirmation)
+        self.assertNotIn('pending_planner_retry',result)
+
+    def test_new_planner_failure_saves_recoverable_stage(self):
+        t=self.ready();t['package']=priced(t);w.verify_coverage(t)
+        t.update(plan=None,document=None,status='retrieving',resume_status='brief_ready')
+        t['brief_confirmation']={'analysis_hash':ba.digest(t['brief_analysis'])};db.save(t,'fixture at planner')
+        from backend import content_planner as cp
+        async def fail(*args,**kwargs):
+            t['planner_runs']=[dict(status='failed')]
+            raise ServiceError('候选卖点策划失败：合成错误')
+        with patch.object(cp,'generate',side_effect=fail):
+            with self.assertRaises(ServiceError):asyncio.run(w.build_content_plan(t))
+        saved=db.get(t['id']);self.assertEqual(saved['status'],'planning');self.assertEqual(saved['resume_status'],'needs_review')
+        self.assertEqual(saved['package'],t['package'])
+
+    def test_planner_failure_check_does_not_allow_unconfirmed_brief_resume(self):
+        t=self.ready();t.update(status='error',resume_status='brief_ready',package=priced(t),plan=None,document=None,planner_runs=[dict(status='failed')])
+        t['brief_confirmation']=None;t['error']='候选卖点策划失败';t=db.save(t,'fixture unconfirmed planner')
+        r=self.client.post(f"/api/tasks/{t['id']}/resume-plan",json=dict(version=t['version']))
+        self.assertEqual(r.status_code,400)
+
     def test_old_brief_roundtrips_without_injected_defaults_changing_hash(self):
         t=self.ready();t["brief_analysis"].pop("commercial_requests",None)
         for r in t["brief_analysis"]["retrieval_plan"]["facts"]:r.pop("category",None)

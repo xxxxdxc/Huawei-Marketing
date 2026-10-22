@@ -182,8 +182,8 @@ class BriefAgentTests(unittest.TestCase):
         with patch.object(w.ima,"retrieve",AsyncMock()) as retrieve:
             with self.assertRaises(ValueError):asyncio.run(w.plan(t))
         retrieve.assert_not_awaited()
-    def test_required_evidence_gap_stops_before_image_selection(self):
-        t=self.ready();t["brief_confirmation"]={"analysis_hash":ba.digest(t["brief_analysis"])}
+    def test_identity_evidence_gap_stops_before_image_selection(self):
+        t=self.ready();t['brief_analysis']['retrieval_plan']['facts'][0]['guardrail']='identity';t["brief_confirmation"]={"analysis_hash":ba.digest(t["brief_analysis"])}
         package=copy.deepcopy(prepared()["package"])
         raw=dict(facts=package["facts"],conflicts=[],coverage=[dict(request_id="R1",status="not_found",fact_ids=[],reason="原文不足以回答指定配置条件")])
         with patch.object(w.ima,"retrieve",AsyncMock(return_value=package)) as retrieve,patch.object(w.llm,"complete",AsyncMock(return_value=raw)) as model:

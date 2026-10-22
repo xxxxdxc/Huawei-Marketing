@@ -151,8 +151,8 @@ class EvidenceResolutionTests(unittest.TestCase):
         self.assertEqual(self.confirm(old,p).status_code,409)
         self.assertIsNone(db.get(t["id"]).get("execution_scope"))
 
-    def test_required_remaining_gap_prevents_confirm(self):
-        t=paused();p=self.preview(t,requests=["R3"])
+    def test_identity_remaining_gap_prevents_confirm(self):
+        t=paused();t['brief_analysis']['retrieval_plan']['facts'][0]['guardrail']='identity';t['brief_confirmation']['analysis_hash']=ba.digest(t['brief_analysis']);db.save(t,'identity fixture');p=self.preview(t,requests=["R3"])
         self.assertFalse(p["can_apply"])
         self.assertTrue(any(b["request_id"]=="R1" for b in p["remaining_blockers"] if b.get("request_id")))
         self.assertEqual(self.confirm(t,p).status_code,400)

@@ -30,6 +30,25 @@ class PlannerTests(unittest.TestCase):
         t,p=valid();c=p['planning_analysis']['candidates'][0];self.assertEqual(c['total_score'],75);self.assertEqual(c['rank'],1)
     def test_evidence_conditions_are_merged(self):
         t,p=valid();self.assertIn('实际因配置而异',p['planning_analysis']['candidates'][0]['conditions'])
+    def test_source_conditions_enrich_without_breaking_saved_selection(self):
+        from backend import planner_schemas as P
+        t,p=valid();c=copy.deepcopy(p['planning_analysis']['candidates'][0]);c.pop('total_score');c.pop('rank')
+        c['conditions']=[f'模型限定{i}' for i in range(10)]
+        raw=dict(product_id=t['product_id'],candidates=[c]);P.CandidateBatch.model_validate(raw)
+        ranked=cp.rank_candidates(t,raw)
+        self.assertEqual(len(ranked[0]['conditions']),11)
+        plan=cp.selection_plan(t,ranked,[c['id']]);cp.validate_selection_plan(t,plan)
+        t['plan']=plan;self.assertEqual(cp.trusted_candidates(t),ranked)
+        P.EnrichedCandidateBatch.model_validate(dict(product_id=t['product_id'],candidates=[{k:v for k,v in ranked[0].items() if k in P.SellingPoint.model_fields}]))
+        with self.assertRaises(ValidationError):P.CandidateBatch.model_validate(dict(product_id=t['product_id'],candidates=[{k:v for k,v in ranked[0].items() if k in P.SellingPoint.model_fields}]))
+
+    def test_auxiliary_request_links_are_derived_without_inventing_evidence(self):
+        from backend import planner_schemas as P
+        t,p=valid();c=copy.deepcopy(p['planning_analysis']['candidates'][0]);c.pop('total_score');c.pop('rank');c['request_ids']=['unknown-request']
+        ranked=cp.rank_candidates(t,dict(product_id=t['product_id'],candidates=[c]))
+        self.assertNotIn('unknown-request',ranked[0]['request_ids'])
+        self.assertEqual(ranked[0]['fact_ids'],c['fact_ids']);self.assertTrue(t['package']['request_link_repairs'])
+
     def test_unknown_candidate_fact_rejected(self):
         t,p=valid();c=copy.deepcopy(p['planning_analysis']['candidates'][0]);c.pop('total_score');c.pop('rank');c['fact_ids']=['F999']
         with self.assertRaises(ValueError):cp.rank_candidates(t,dict(product_id=t['product_id'],candidates=[c]))

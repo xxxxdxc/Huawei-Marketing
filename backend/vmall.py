@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import re
+from pathlib import Path
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 import httpx
@@ -62,8 +63,8 @@ def norm(value):
 
 def model_matches(product, display):
     actual=str(display.get("name",""))
-    base=norm(product["name"]).replace("鸿蒙版","").replace("harmonyos","")
-    other=norm(actual).replace("鸿蒙版","").replace("harmonyos","")
+    base=re.sub(r'^(?:huawei|华为)','',norm(product["name"])).replace("鸿蒙版","").replace("harmonyos","")
+    other=re.sub(r'^(?:huawei|华为)','',norm(actual)).replace("鸿蒙版","").replace("harmonyos","")
     # Catalog aliases may include CPU family, but never merge display sizes or Pro/GT.
     base=base.replace("酷睿ultra","")
     if base!=other:return False
@@ -74,22 +75,37 @@ def model_matches(product, display):
     return bool(actual)
 
 
-async def candidate_urls(task):
-    """Use exact-model catalog mappings, never guess a similar product."""
-    p=task["package"];urls=[]
-    texts=[s["text"] for s in p["sources"]]
-    try:
-        backend=knowledge.backend(task.get("knowledge_source","ima"),task.get("knowledge_zip_path"))
-        texts.extend(s["text"] for s in await backend.public_price_sources(p["product"]))
-    except (ServiceError,KeyError,OSError):
-        pass
+def registry_urls(product):
+    rows=json.loads((Path(__file__).parent/'vmall_products.json').read_text(encoding='utf-8'))
+    return [r['url'] for r in rows if re.sub(r'^(?:huawei|华为)','',norm(r['product_name']))==re.sub(r'^(?:huawei|华为)','',norm(product.get('name',''))) and r['system']==('harmony' if '鸿蒙' in product.get('category','') else 'windows')]
+
+
+def evidence_text(value,path='商品'):
+    if isinstance(value,dict):return '\n'.join(evidence_text(v,path+'.'+k) for k,v in value.items())
+    if isinstance(value,list):return '\n'.join(evidence_text(v,path+f'[{i}]') for i,v in enumerate(value))
+    return path+'：'+str(value)
+
+
+def source_urls(texts):
+    urls=[]
     for text in texts:
-        for raw in re.findall(r"https://[^\s<>\"，）,;]+",text):
-            url=raw.rstrip(".,;）")
-            parsed=urlparse(url);qs=parse_qs(parsed.query)
-            if allowed(url,PAGE_HOSTS) and parsed.path=="/product/comdetail/index.html" and re.fullmatch(r"\d+",qs.get("prdId",[""])[0]):
+        for raw in re.findall(r'https://[^\s<>"，）,;]+',text):
+            url=raw.rstrip('.,;）');parsed=urlparse(url);qs=parse_qs(parsed.query)
+            if allowed(url,PAGE_HOSTS) and parsed.path=='/product/comdetail/index.html' and re.fullmatch(r'\d+',qs.get('prdId',[''])[0]):
                 if url not in urls:urls.append(url)
-    return urls[:3]
+    return urls
+
+
+async def candidate_urls(task):
+    """Reuse saved links and exact registry seeds before requesting any old catalog."""
+    p=task['package'];urls=source_urls([s['text'] for s in p['sources']])
+    for url in registry_urls(p['product']):
+        if url not in urls:urls.append(url)
+    if urls:return urls[:5]
+    try:
+        backend=knowledge.backend(task.get('knowledge_source','ima'),task.get('knowledge_zip_path'))
+        return source_urls([s['text'] for s in await backend.public_price_sources(p['product'])])[:5]
+    except (ServiceError,KeyError,OSError,httpx.HTTPError,TimeoutError):return []
 
 
 def photo_url(photo):
@@ -168,7 +184,7 @@ async def supplement(task,need_facts=False,minimum_images=1):
     try:
         async with asyncio.timeout(100):
             return await _supplement(task,need_facts,minimum_images)
-    except (httpx.HTTPError,TimeoutError,ValueError,KeyError,TypeError) as exc:
+    except (httpx.HTTPError,TimeoutError,ValueError,KeyError,TypeError,AttributeError) as exc:
         raise ServiceError("华为商城商品资料暂不可读取或格式已变化；未采用不完整内容") from exc
 
 
@@ -183,10 +199,11 @@ async def _supplement(task,need_facts,minimum_images):
             try:data=await read_product(client,url,task);break
             except (ServiceError,httpx.HTTPError,ValueError,KeyError,TypeError) as exc:failures.append(type(exc).__name__)
         if data is None:raise ServiceError("商城页面未能返回匹配型号、版本和配置的完整资料")
-        text=json.dumps(data["facts"],ensure_ascii=False,indent=2)
+        raw_json=json.dumps(data['facts'],ensure_ascii=False,indent=2)
+        text=evidence_text(data['facts'])
         sid="V"+short_id(data["api_url"]+text)
         sources=[dict(id=sid,title="华为商城商品及 SKU 资料",path=data["page_url"],url=data["page_url"],
-            api_url=data["api_url"],retrieval_method=data["retrieval_method"],retrieved_url=data["retrieved_url"],text=text,retrieved_at=db.now(),knowledge_source="vmall",
+            api_url=data["api_url"],retrieval_method=data["retrieval_method"],retrieved_url=data["retrieved_url"],text=text,raw_json=raw_json,text_view='decoded_json_values',retrieved_at=db.now(),knowledge_source="vmall",
             sku=str(data["sku"]["sbomCode"]),response_sha256=hashlib.sha256(text.encode()).hexdigest())] if need_facts else []
         images=[];known={im.get("sha256") for im in task["package"].get("images",[]) if im.get("sha256")}
         needed=max(0,min(6,minimum_images-len([im for im in task["package"].get("images",[]) if im.get("visual_checked") and im.get("usable",True)])))

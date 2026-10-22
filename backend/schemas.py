@@ -403,6 +403,7 @@ class RetrievalFacts(Facts):
 class TaskView(Strict):
     """Preserve existing task properties while publishing the V2 response schema."""
     model_config = ConfigDict(extra="allow", strict=True)
+    prewrite_recovery: dict | None = None
     id: str
     version: int
     status: str

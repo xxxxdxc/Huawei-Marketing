@@ -13,7 +13,12 @@ export const POLICIES: Record<string, { min: number; max: number; recommended?: 
 };
 export const STATUS: Record<string, string> = { draft: '待分析', analyzing: '理解需求中', needs_information: '待补充信息', brief_ready: '待确认策略', retrieving: '检索与整理资料中', planning: '规划内容中', plan_ready: '待确认规划', writing: '生成图文中', reviewing: '核验中', approved: '已核验', needs_review: '待核验 / 处理问题', error: '已暂停' };
 export const BUSY = ['analyzing', 'retrieving', 'planning', 'writing', 'reviewing'];
-export const effectiveStatus = (task: Task) => task.status === 'error' ? task.resume_status : task.status;
+export const effectiveStatus = (task: Task) => {
+  if (task.status === 'error' && task.prewrite_recovery) return 'needs_review';
+  // Older failed Planner jobs kept brief_ready even though retrieval was done.
+  if (task.status === 'error' && task.package?.coverage?.length && !task.plan && !task.document && /候选卖点|卖点候选|规划结果|内容规划|Content Planner/i.test(task.error || '')) return 'needs_review';
+  return task.status === 'error' ? task.resume_status : task.status;
+};
 export const errorMessage = (e: unknown) => e instanceof Error ? e.message : '操作未完成，请重试。';
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 export async function api<T>(path: string, method = 'GET', data?: unknown, signal?: AbortSignal): Promise<T> {

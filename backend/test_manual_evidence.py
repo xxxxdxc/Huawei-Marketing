@@ -53,14 +53,16 @@ class ManualEvidenceTests(unittest.TestCase):
         for flags in ({'missing':True},{'conflict':True}):
             with self.subTest(flags=flags):
                 t=self.prepared()
+                if flags.get('missing'):t['brief_analysis']['retrieval_plan']['facts'][0]['guardrail']='identity';t['brief_confirmation']['analysis_hash']=w.ba.digest(t['brief_analysis'])
                 with patch.object(w,'extract_facts',AsyncMock(return_value=extraction(t,**flags))),patch.object(w,'build_content_plan',AsyncMock()) as planner:
                     asyncio.run(me.run(t))
                 self.assertEqual(t['status'],'needs_review');planner.assert_not_awaited()
                 self.assertGreaterEqual(len(t['package']['sources']),2)
     def test_forged_quote_rejected_and_original_input_preserved(self):
         t=self.prepared();raw=extraction(t);raw['facts'][-1]['quote']='这段原文从未出现在任何提供的来源之中'
-        with patch.object(w,'extract_facts',AsyncMock(return_value=raw)),self.assertRaises(Exception):asyncio.run(me.run(t))
-        self.assertEqual(t['manual_evidence'][0]['text'],TEXT);self.assertEqual(t['manual_evidence'][0]['status'],'error')
+        with patch.object(w,'extract_facts',AsyncMock(return_value=raw)),patch.object(w.llm,'complete',AsyncMock(return_value={'facts':[]})),patch.object(w,'build_content_plan',AsyncMock()):asyncio.run(me.run(t))
+        self.assertEqual(t['manual_evidence'][0]['text'],TEXT);self.assertTrue(t['package']['rejected_facts'])
+        self.assertNotIn('FM1',{f['id'] for f in t['package']['facts']})
     def test_attach_retains_supplement_after_original_source_refresh(self):
         t=self.prepared();fresh={'sources':[]};me.attach(t,fresh);me.attach(t,fresh)
         self.assertEqual(len(fresh['sources']),1)

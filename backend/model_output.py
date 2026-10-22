@@ -16,6 +16,41 @@ class InvalidOutput(ValueError):
         self.finish_reason=finish_reason;self.usage=usage or {}
 
 
+
+def unwrap_json(text):
+    """Accept one complete JSON value surrounded by prose, never repair JSON.
+
+    Scan balanced outer containers so a nested object inside a truncated or
+    invalid response cannot be mistaken for its complete root object.
+    """
+    decoder=json.JSONDecoder();values=[];stack=[];start=None;quoted=False;escaped=False
+    for index,char in enumerate(text):
+        if not stack:
+            if char in "{[":start=index;stack.append(char);quoted=False;escaped=False
+            continue
+        if quoted:
+            if escaped:escaped=False
+            elif char=="\\":escaped=True
+            elif char=='"':quoted=False
+            continue
+        if char=='"':quoted=True
+        elif char in "{[":stack.append(char)
+        elif char in "}]":
+            if stack[-1]!={'}':'{',']':'['}.get(char):
+                # A mismatched container is not explanation text to discard.
+                raise ValueError('JSON 括号不匹配')
+            stack.pop()
+            if not stack:
+                chunk=text[start:index+1]
+                try:value,end=decoder.raw_decode(chunk)
+                except ValueError:continue
+                if end==len(chunk):values.append(value)
+    if stack:raise ValueError('JSON 对象未结束')
+    if len(values)!=1 or not isinstance(values[0],dict):
+        raise ValueError('响应必须包含唯一完整 JSON 对象')
+    return values[0]
+
+
 def decode(data,schema):
     if not isinstance(data,dict):raise InvalidOutput("envelope","响应不是对象")
     choices=data.get("choices")
@@ -40,8 +75,10 @@ def decode(data,schema):
     if match:text=match[1]
     try:value=json.loads(text)
     except (ValueError,TypeError) as exc:
-        detail=dict(message="响应不是完整 JSON",line=getattr(exc,"lineno",None),column=getattr(exc,"colno",None))
-        raise InvalidOutput("invalid_json",detail,content,finish,usage) from exc
+        try:value=unwrap_json(text)
+        except ValueError:
+            detail=dict(message="响应未包含唯一完整 JSON 对象",line=getattr(exc,"lineno",None),column=getattr(exc,"colno",None))
+            raise InvalidOutput("invalid_json",detail,content,finish,usage) from exc
     try:return schema.model_validate(value).model_dump()
     except ValidationError as exc:
         errors=[]
@@ -77,7 +114,7 @@ def describe(error,schema,identifier):
     label=LABELS.get(schema.__name__,schema.__name__)
     if error.kind=="truncated":reason="两次响应均未形成完整结果，最后一次达到输出上限"
     elif error.kind=="empty_content":reason="两次尝试后仍未返回最终文本"
-    elif error.kind=="invalid_json":reason="两次尝试后仍不是完整 JSON"
+    elif error.kind=="invalid_json":reason="模型返回格式不符，未获得唯一完整 JSON 对象"
     elif error.kind=="refusal":reason="模型未完成本次核验或生成"
     elif error.kind=="schema":
         entries=error.detail[:2]

@@ -66,8 +66,10 @@ async def run(t, reuse_facts=False):
             w.event(t,'已保存重新评估结果；原文和事实卡未重写，继续程序检查')
             raw=dict(coverage=result['coverage'])
         else:raw=await w.extract_facts(t)
-        candidate=copy.deepcopy(package);candidate.update(raw);w.verify_facts(candidate)
-        package=candidate;t['package']=package
+        candidate=copy.deepcopy(package);candidate.update(raw)
+        checking=copy.deepcopy(t);checking['package']=candidate
+        await w.reconcile_extracted(checking)
+        package=checking['package'];t['package']=package
         entry['status']='checked';entry['checked_at']=db.now()
         gaps=w.verify_coverage(t)
         package['manual_source_notice']='含用户手动补充原文；链接未独立验证，资料支持不等于独立真实性验证'

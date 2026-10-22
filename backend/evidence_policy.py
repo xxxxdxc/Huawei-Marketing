@@ -106,7 +106,7 @@ def apply(t):
     for c in coverage:
         r=by_request[c["request_id"]];kind=request_kind(r)
         if c["status"]!="supported" and kind in COMMERCIAL:missing(r["id"],c["status"],c["reason"])
-        elif kind=="product" and (c["status"]=="conflict" or (c["status"]=="partial" and usage.partial_is_blocked(t,r)) or (r["priority"]=="required" and c["status"] not in ("supported","partial"))):
+        elif kind=="product" and (c["status"]=="conflict" or (c["status"]=="partial" and usage.partial_is_blocked(t,r)) or (c["status"] not in ("supported","partial") and (r.get('guardrail','none')!='none' or usage.explicit_musts(t,r) or usage.complete_conditions_required(t,r)))):
             gaps.append(dict(request=r,coverage=c,blocking_reason="product_evidence"))
     conflicts=copy.deepcopy(p.get("conflicts",[]));active=[];sources={s["id"] for s in p["sources"]}
     for conflict in conflicts:
@@ -152,7 +152,7 @@ def apply(t):
         r=by_request[c["request_id"]];kind=request_kind(r)
         if c["status"] in ("supported","partial") and not set(c["fact_ids"]) & kept_ids:
             if kind in COMMERCIAL:missing(r["id"],"not_usable","返回的资料不构成该项可引用的独立商业证据")
-            elif r["priority"]=="required":gaps.append(dict(request=r,coverage=c,blocking_reason="product_evidence",reason="该核心请求没有可用的独立产品事实"))
+            elif r.get('guardrail','none')!='none' or usage.explicit_musts(t,r) or usage.complete_conditions_required(t,r):gaps.append(dict(request=r,coverage=c,blocking_reason="product_evidence",reason="该核心请求没有可用的独立产品事实"))
             # An optional product request citing only a removed policy card is omitted.
     blocked=[]
     for rid,decision in omissions.items():
@@ -171,6 +171,12 @@ def apply(t):
         else:
             lead=label+"资料存在冲突" if any(d["status"]=="conflict" for d in omissions.values()) else "未找到"+label+"依据"
             notices.append(lead+"，本次不包含这些内容，继续使用已有产品事实做规划；其他有依据的信息继续保留。")
+    product_omissions=[dict(request_id=r['id'],reason=by_coverage[r['id']]['reason']) for r in requests if request_kind(r)=='product' and (by_coverage[r['id']]['status']=='not_found' or not set(by_coverage[r['id']]['fact_ids']) & kept_ids)]
+    if product_omissions:notices.append('部分产品方向没有可引用依据，本次省略相关内容，继续使用已核验的产品事实。')
+    if not any(kinds[f['id']]=='product' for f in kept):
+        r=next((r for r in requests if request_kind(r)=='product'),None)
+        if r and not any(g['request']['id']==r['id'] for g in gaps):gaps.append(dict(request=r,coverage=by_coverage[r['id']],blocking_reason='product_evidence',reason='没有可用于图文的产品事实'))
+    p['omitted_product_requests']=product_omissions
     p["writing_boundaries"]=boundaries
     p["all_facts"]=all_facts;p["all_conflicts"]=conflicts;p["conflicts"]=active;p["facts"]=kept
     omitted_categories=sorted((COMMERCIAL-allowed) | (missing_kinds-kept_kinds))

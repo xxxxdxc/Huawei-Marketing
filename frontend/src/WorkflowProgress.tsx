@@ -19,6 +19,13 @@ export default function WorkflowProgress({ task, onOpen, dirty = false }: { task
   if (failed && state === 'plan_ready') { states[3] = 'done'; states[4] = 'failed'; }
   const adaptingPlatform = isPlatformAdaptation(task);
   if (adaptingPlatform) { states[3] = 'done'; states[4] = BUSY.includes(task.status) ? 'running' : 'failed'; states[5] = 'waiting'; }
+  if (failed && task.prewrite_recovery) {
+    const stage = task.prewrite_recovery.stage;
+    states.fill('waiting'); states[0] = 'done';
+    const index = stage === 'source_retrieval' ? 1 : stage === 'selling_points' ? 3 : 2;
+    for (let i = 1; i < index; i++) states[i] = 'done';
+    states[index] = 'failed';
+  }
   const labels: Record<string, string> = { done: '已完成', confirm: '需要你处理', running: '运行中', failed: '已暂停', waiting: '等待中' };
   const selectionFlow = usesSellingPointFlow(task) || plannerGenerationFailed(task);
   const steps = [['理解营销需求', 'strategy'], ['检索产品资料', 'evidence'], ['整理事实与图片', 'evidence'], [plannerGenerationFailed(task) ? '生成卖点建议' : selectionFlow ? '确认核心卖点' : '规划图文内容', plannerGenerationFailed(task) ? 'evidence' : 'plan'], [adaptingPlatform ? '适配新平台资料' : selectionFlow ? '编排并生成图文' : '生成平台文案', 'draft'], ['核验并优化', 'draft']];

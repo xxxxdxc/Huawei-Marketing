@@ -120,3 +120,19 @@ Document/Plan及所有写入端点保持兼容；内部repair改为TextRepair，
 手动补充文字依据：`POST /api/tasks/{tid}/manual-evidence`，请求与处理限制见 `MANUAL_EVIDENCE.md`。审查 actions 新增 manual_evidence；原 refresh-evidence 仍只重读原资料源。新增 Source.source_type=user_manual、source_url、link_verified=false，以及 Review.source_verification；旧数据和接口保持兼容。
 
 coverage.status 新增 partial，fact_ids 保留已有支持；missing_details、usage_limits 为工作人员说明。不要将 partial 渲染为“没有直接依据”或“全部已核实”；普通检索条件部分缺失可继续，真实 guardrail/冲突和用户明确完整条件要求仍处理。写作规则卡仅在 writing_boundaries/all_facts 追溯，不进入可宣传事实。
+
+
+## 2026-10-22：资料处理步骤恢复与临时模型错误
+
+`GET /api/tasks/{id}` 增加可空只读字段 `prewrite_recovery`：`stage`（source_retrieval / fact_extraction / image_review / selling_points）、`label`、`resumable`、`reason`。仅失败且尚无规划或成稿的任务可恢复；不应根据 HTTP 文案猜测失败模块。
+
+使用 `POST /api/tasks/{id}/retry-prewrite`，请求 `{version}`，返回 202。保留已确认 Brief，从对应步骤继续；图片阶段不重新检索或提取事实，卖点阶段不重新核图。成功后停在卖点确认，不能自动写稿。恢复前校验策略确认、型号、原文、事实、图片与取舍的检查点指纹；输入变化、缺少原文、过期版本或运行中状态拒绝恢复。
+
+旧任务可根据最后一个真实阶段事件识别图片核验失败；历史中的旧 Planner 错误不能覆盖后续图片失败。前端显示“重试图片核验”等实际阶段按钮；没有完整覆盖结果时不伪装成资料缺口或要求重新分析需求。
+
+模型调用的总尝试次数最多 2 次，包含格式修正与临时失败重试。408 / 500 / 502 / 503 / 504 / 520 / 522 / 523 / 524 及连接、读取超时，首次失败等待 1 秒再试；401 / 403 及已识别额度错误不重试。重试可能产生额外模型费用，不能保证上游服务恢复；二次失败保留当前步骤。事实、图片与合规校验维持原规则。
+
+
+## 2026-10-22：摘录与首次商城补充
+
+详见 [EVIDENCE_INGESTION.md](EVIDENCE_INGESTION.md)。Package 保留 `quote_repairs`（原摘录及真实连续原文定位）、`rejected_facts`、`unresolved_fact_ids`、`omitted_product_requests`、`supplement_attempts` 等只读审计。普通检索priority不等于文案必写；仍执行已确认的真实门槛。华为商城逐来源标记，不冒称来自ima；原事实ID保持，新来源增量加入。

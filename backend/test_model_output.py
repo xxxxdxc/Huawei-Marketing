@@ -61,9 +61,9 @@ class ModelOutputTests(unittest.TestCase):
         fence=chr(96)*3
         self.assertEqual(mo.decode(envelope(content=fence+"json\n"+json.dumps(VALID)+"\n"+fence),S.Review),VALID)
 
-    def test_arbitrary_prose_is_not_silently_extracted(self):
+    def test_explanation_without_a_complete_json_object_is_rejected(self):
         with self.assertRaises(mo.InvalidOutput):
-            mo.decode(envelope(content="请看这里："+json.dumps(VALID)),S.Review)
+            mo.decode(envelope(content="请看这里：只有说明，没有完整对象。"),S.Review)
 
     def test_string_boolean_is_not_coerced(self):
         bad=dict(summary="x",issues=[dict(category="fact",location="正文",detail="测试",severity="error",repairable="false")])
@@ -87,6 +87,36 @@ class ModelOutputTests(unittest.TestCase):
     def test_invalid_json_diagnostic_has_line_and_column(self):
         with self.assertRaises(mo.InvalidOutput) as caught:mo.decode(envelope(content='{"summary":'),S.Review)
         self.assertEqual(caught.exception.kind,"invalid_json");self.assertEqual(caught.exception.detail["line"],1)
+
+    def test_wrapped_json_and_invalid_type_example_are_accepted(self):
+        text='Explanation {"value": int, "reason": str}\n```json\n'+json.dumps(VALID)+'\n```\nEnd.'
+        self.assertEqual(mo.decode(envelope(content=text),S.Review),VALID)
+
+    def test_wrapper_preserves_escaped_quotes_and_braces_in_strings(self):
+        value=dict(summary='A "quote" and {braces} with \\ slash',issues=[])
+        self.assertEqual(mo.decode(envelope(content='Result: '+json.dumps(value)+' Done.'),S.Review),value)
+
+    def test_multiple_complete_json_objects_are_rejected(self):
+        for text in (json.dumps(VALID)+'\n'+json.dumps(VALID),'{}\n'+json.dumps(VALID)):
+            with self.subTest(text=text),self.assertRaises(mo.InvalidOutput) as caught:
+                mo.decode(envelope(content=text),S.Review)
+            self.assertEqual(caught.exception.kind,'invalid_json')
+
+    def test_truncated_outer_object_cannot_expose_nested_valid_object(self):
+        for text in ('Explanation {"nested":'+json.dumps(VALID),'Explanation '+json.dumps(VALID)+' {"unfinished":'):
+            with self.subTest(text=text),self.assertRaises(mo.InvalidOutput):
+                mo.decode(envelope(content=text),S.Review)
+
+    def test_wrapped_array_is_not_unwrapped_to_inner_object(self):
+        with self.assertRaises(mo.InvalidOutput):mo.decode(envelope(content='Result: ['+json.dumps(VALID)+']'),S.Review)
+
+    def test_wrapped_json_keeps_strict_schema_and_finish_checks(self):
+        with self.assertRaises(mo.InvalidOutput) as caught:
+            mo.decode(envelope(content='Result: '+json.dumps(dict(summary='x',issues=[],passed='true'))),S.Review)
+        self.assertEqual(caught.exception.kind,'schema')
+        with self.assertRaises(mo.InvalidOutput) as caught:
+            mo.decode(envelope(content='Result: '+json.dumps(VALID),finish='length'),S.Review)
+        self.assertEqual(caught.exception.kind,'truncated')
 
     def test_missing_envelope_fields_are_reported(self):
         with self.assertRaises(mo.InvalidOutput) as caught:mo.decode({"error":{"code":"fixture"}},S.Review)

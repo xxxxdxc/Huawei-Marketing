@@ -33,6 +33,14 @@ class CandidateBatch(Strict):
     product_id:str
     candidates:list[SellingPoint]=Field(min_length=1,max_length=8)
 
+class EnrichedSellingPoint(SellingPoint):
+    # Up to 10 model conditions plus one source condition for each of 10 facts.
+    conditions:list[str]=Field(max_length=20)
+
+class EnrichedCandidateBatch(Strict):
+    product_id:str
+    candidates:list[EnrichedSellingPoint]=Field(min_length=1,max_length=8)
+
 class Narrative(Strict):
     framework:Literal['scene_story','problem_solution','buying_guide','selling_point_focus']
     reason:str=Field(min_length=1,max_length=600)

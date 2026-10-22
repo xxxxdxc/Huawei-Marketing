@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from . import storage as db, schemas as S, workflow as w, brief_agent as ba
-from . import platform_change as pc, evidence_resolution as er, content_planner as cp
+from . import platform_change as pc, evidence_resolution as er, content_planner as cp, prewrite_recovery as pr
 from .content_layout import effective_layout
 from .clients import llm, ServiceError, KB_NAME
 from .knowledge import knowledge as ima
@@ -23,7 +23,7 @@ async def lifespan(app):
             t["status"]="error";t["error"]="上次运行被中断，中间状态已保存，请重试。";db.save(t,"启动时恢复中断任务")
     yield
 
-app=FastAPI(title="华为 PC 门店图文助手",version="0.6.1",lifespan=lifespan)
+app=FastAPI(title="华为 PC 门店图文助手",version="0.7.0",lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=os.getenv("HUAWEI_ALLOWED_HOSTS","127.0.0.1,localhost,testserver").split(","))
 
 @app.middleware("http")
@@ -48,8 +48,14 @@ async def value_error(request,exc):
 @app.exception_handler(KeyError)
 async def missing(request,exc):return Response('{"detail":"任务或版本不存在"}',status_code=404,media_type="application/json")
 
+@app.post('/api/maintenance/restore',include_in_schema=False)
+async def restore_deployment_backup(request:Request):
+    from .maintenance_restore import restore
+    return await restore(request)
+
+
 @app.get("/api/health")
-def health():return {"ok":True,"app":"华为 PC 门店图文助手","brief_schema_version":"2","knowledge_source":get_settings()["knowledge_source"]}
+def health():return {"ok":True,"app":"华为 PC 门店图文助手","brief_schema_version":"2","knowledge_source":get_settings()["knowledge_source"],"evidence_policy_version":"3","quote_localization":"bounded-format-v1","vmall_initial_supplement":True}
 
 @app.get("/api/settings")
 def settings():return public_settings()
@@ -91,6 +97,9 @@ async def create_task(body:S.NewTask):
 @app.get("/api/tasks/{tid}",response_model=S.TaskView,response_model_exclude_unset=True)
 def get_task(tid:str):
     t=db.get(tid);t["can_export"]=w.can_export(t)
+    t["prewrite_recovery"]=pr.info(t)
+    if t["prewrite_recovery"] and "模型服务返回 HTTP 524" in (t.get("error") or ""):
+        t["error"]="上次"+t["prewrite_recovery"]["label"]+"遇到模型网关或上游响应超时（HTTP 524）；已保存资料，可重试当前步骤。"
     if t["status"]=="error":
         t["resume_status"]=w.current(t)
         if t["resume_status"]=="needs_review" and t.get("error")=="模型连续两次未返回符合结构要求的完整结果，未采用不完整输出":
@@ -125,10 +134,10 @@ def begin(tid,body,states,operation,bg,update=None):
         t=db.get(tid);w.require(t,states)
         if t["version"]!=body.version:raise ValueError("任务已更新，请刷新后重试")
         if update:update(t)
-        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","replan":"plan_ready","replan_points":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review","manual_evidence":"needs_review"}[operation]
-        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","replan":"planning","replan_points":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving","manual_evidence":"retrieving"}[operation]
+        t["resume_status"]={"analyze":"draft","plan":"brief_ready","write":"plan_ready","review":"needs_review","resume_plan":"needs_review","retry_prewrite":"needs_review","replan":"plan_ready","replan_points":"plan_ready","resolve_evidence":"needs_review","refresh_evidence":"needs_review","manual_evidence":"needs_review"}[operation]
+        t["status"]={"analyze":"analyzing","plan":"retrieving","write":"writing","review":"reviewing","resume_plan":"planning","retry_prewrite":"planning","replan":"planning","replan_points":"planning","resolve_evidence":"planning","refresh_evidence":"retrieving","manual_evidence":"retrieving"}[operation]
         t["error"]=None;t["review"]=None
-        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认卖点或历史规划，开始编排并写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","replan":"仅切换平台，复用需求与核心策略，重新规划","replan_points":"保存卖点选择，原版本暂时保留","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查","manual_evidence":"用户提交手动原文与来源链接，重新检查"}[operation],body.version)
+        db.save(t,{"analyze":"开始分析需求","plan":"用户已确认策略，开始检索资料","write":"用户已确认卖点或历史规划，开始编排并写稿","review":"重新核验当前稿件","resume_plan":"按当前规则重新评估已保存资料并继续规划","retry_prewrite":"用户重试已保存检查点，保留已确认需求与完成资料","replan":"仅切换平台，复用需求与核心策略，重新规划","replan_points":"保存卖点选择，原版本暂时保留","resolve_evidence":"用户明确确认局部取舍，复用资料继续规划","refresh_evidence":"用户请求刷新原资料源并重新检查","manual_evidence":"用户提交手动原文与来源链接，重新检查"}[operation],body.version)
         bg.add_task(w.job,tid,operation)
         return {"accepted":True,"task_id":tid}
 
@@ -185,12 +194,19 @@ def confirm_brief(tid:str,body:S.BriefUpdate,bg:BackgroundTasks):
             t["package"]=None;t["plan"]=None;t["document"]=None;t["user_image_overrides"]={}
         return begin(tid,body,{"brief_ready","needs_information","plan_ready","needs_review","approved"},"plan",bg,update)
 
+@app.post("/api/tasks/{tid}/retry-prewrite",status_code=202)
+def retry_prewrite(tid:str,body:S.Versioned,bg:BackgroundTasks):
+    def update(t):t["pending_prewrite_retry"]=pr.authorize(t)
+    return begin(tid,body,{"needs_review"},"retry_prewrite",bg,update)
+
+
 @app.post("/api/tasks/{tid}/resume-plan",status_code=202)
 def resume_plan(tid:str,body:S.Versioned,bg:BackgroundTasks):
     def update(t):
         ba.assert_confirmed(t)
         if t.get("plan") or t.get("document") or not t.get("package") or not t["package"].get("coverage"):
             raise ValueError("只可恢复已有检索资料但尚无规划和文稿的任务")
+        if w.failed_planner(t):t["pending_planner_retry"]=True
         if t.get('manual_evidence'):
             t.setdefault('evidence_refreshes',[]).append(dict(kind='saved_manual_recheck',requested_at=db.now(),authorized_version=t['version']+1))
     return begin(tid,body,{"needs_review"},"resume_plan",bg,update)

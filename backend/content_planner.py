@@ -16,7 +16,7 @@ METHOD_SOURCES=['content-strategy']
 from .marketing_methods import PLANNER_METHOD,METHOD_GUARD
 ADAPTER=(ROOT/'planner_adapter.md').read_text(encoding='utf-8-sig')+'\n'+METHOD_GUARD+PLANNER_METHOD+'\n'+pub.CORE
 CANDIDATE_PROMPT="""你是Content Planner候选取舍阶段，只做内容选择与编排准备，不写平台文案。product_id原样返回。每个候选绑定真实fact_ids，说明回应的audience_need；产品利益须能由引用事实支持，不能将待验证假设当作事实。不要重复同一论点凑候选。
-scores四项0到4整数并附reason：audience需求关联、evidence证据直接支持、differentiation本篇辨识度（不代表竞品领先）、image真实画面支持。无相关图image_ids为空且image分为0。不能将外观照片当作参数证明。完整conditions供内部核验，保留配置、约、最高、测试条件。
+scores必须是四个评分对象，不是四个裸整数。结构示例：{"audience":{"value":3,"reason":"关联当前明确需求"},"evidence":{"value":3,"reason":"引用事实直接支持"},"differentiation":{"value":2,"reason":"本篇论点有区分"},"image":{"value":0,"reason":"无直接画面支持"}}。示例只说明类型，不得照抄分值或理由。每项value为0到4整数，reason必须给出具体理由：audience需求关联、evidence证据直接支持、differentiation本篇辨识度（不代表竞品领先）、image真实画面支持。无相关图image_ids为空且image分为0。不能将外观照片当作参数证明。完整conditions供内部核验，保留配置、约、最高、测试条件。
 每个候选给recommendation为recommended或alternative，并给recommendation_reason，解释为何本篇推荐或暂不采用。建议人数见suggested_point_counts，只是少量选用建议，不凑数、不机械TopK；明确需求、重复程度、证据和篇幅共同决定。低分不构成省略必须内容的授权。至少推荐一个候选，并覆盖mandatory_requests与mandatory_needs。mandatory_need_ids仅引用用户明确必须需求的编号，说明该候选事实支持的必须内容；普通检索required不是必写文案。request_ids对应实际有支持事实的检索请求；编号只能来自输入。遵守execution_scope与content_policy。"""
 PLAN_PROMPT="""你是Content Planner段落编排阶段，只安排内容、事实和图片，不生成最终文案、不设计平台写作Skills。product_id原样返回。selected_point_ids必须与输入selected_point_ids集合完全一致，不增选、不漏选；每个选中候选至少由一段真实事实承接。排序帮助取舍，不代表段落必须照排名排列。
 不选择固定叙事框架，不输出narrative或framework；用简短composition_rationale解释为什么采用这个先后顺序和段落安排。
@@ -123,8 +123,9 @@ def candidate_context_matches(t, saved):
     return saved==digest(context)
 
 
-def rank_candidates(t,result):
-    result=P.CandidateBatch.model_validate(result).model_dump()
+def rank_candidates(t,result,enriched=False):
+    schema=P.EnrichedCandidateBatch if enriched else P.CandidateBatch
+    result=schema.model_validate(result).model_dump()
     if result['product_id']!=t['product_id']:raise ValueError('候选卖点返回了其他型号')
     facts={f['id']:f for f in t['package']['facts']};images={i['id']:i for i in t['package']['images']}
     requests,coverage,_=request_context(t)
@@ -139,7 +140,10 @@ def rank_candidates(t,result):
         if scores['evidence']['value']==0:raise ValueError('候选卖点没有直接证据支持')
         if not c['image_ids'] and scores['image']['value']!=0:raise ValueError('没有图片支持时不能声称图片支持得分')
         linked={rid for rid in requests if set(c['fact_ids'])&set(coverage.get(rid,{}).get('fact_ids',[]))}
-        if not set(c['request_ids'])<=linked:raise ValueError('候选卖点关联了没有对应证据的检索请求')
+        if not set(c['request_ids'])<=linked:
+            audit=dict(candidate_id=c['id'],original_request_ids=copy.deepcopy(c['request_ids']),request_ids=sorted(linked),fact_ids=copy.deepcopy(c['fact_ids']),reason='derived_from_verified_coverage')
+            repairs=t['package'].setdefault('request_link_repairs',[])
+            if audit not in repairs:repairs.append(audit)
         c['request_ids']=sorted(linked)
         if len(c['mandatory_need_ids'])!=len(set(c['mandatory_need_ids'])) or not set(c['mandatory_need_ids'])<=need_ids:raise ValueError('候选卖点引用不存在或重复的必须需求编号')
         c['conditions']=list(dict.fromkeys([facts[x]['conditions'] for x in c['fact_ids'] if facts[x].get('conditions')]+c['conditions']))
@@ -179,7 +183,7 @@ def trusted_candidates(t):
         c.setdefault('request_ids',[])
         c.setdefault('mandatory_need_ids',[])
         raw.append(c)
-    return rank_candidates(t,dict(product_id=t['product_id'],candidates=raw))
+    return rank_candidates(t,dict(product_id=t['product_id'],candidates=raw),enriched=True)
 
 def validate(t,plan,enforce_count=True):
     p=t['package'];images={i['id']:i for i in p['images']}
@@ -241,7 +245,7 @@ def validate_selection_plan(t, plan):
     er.assert_plan(t,plan)
     # Revalidate saved provenance; never trust IDs merely because they were stored.
     fields=set(P.SellingPoint.model_fields)
-    ranked=rank_candidates(t,dict(product_id=t['product_id'],candidates=[{k:v for k,v in c.items() if k in fields} for c in a['candidates']]))
+    ranked=rank_candidates(t,dict(product_id=t['product_id'],candidates=[{k:v for k,v in c.items() if k in fields} for c in a['candidates']]),enriched=True)
     if ranked != a['candidates']:raise ValueError('候选评分或证据记录不一致')
     return []
 

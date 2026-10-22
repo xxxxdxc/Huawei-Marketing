@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "华为 PC 门店图文助手",
-    "version": "0.6.1"
+    "version": "0.7.0"
   },
   "paths": {
     "/api/health": {
@@ -469,6 +469,53 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BriefUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{tid}/retry-prewrite": {
+      "post": {
+        "summary": "Retry Prewrite",
+        "operationId": "retry_prewrite_api_tasks__tid__retry_prewrite_post",
+        "parameters": [
+          {
+            "name": "tid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Versioned"
               }
             }
           }
@@ -3162,6 +3209,18 @@
       },
       "TaskView": {
         "properties": {
+          "prewrite_recovery": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Recovery"
+          },
           "id": {
             "type": "string",
             "title": "Id"

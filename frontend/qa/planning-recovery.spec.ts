@@ -4,9 +4,9 @@ import { makeTask, makeV2Task, mockApi } from './fixtures';
 import { selectionPreviewTask } from '../src/selectionPreviewData';
 import type { ReviewOverview } from '../src/evidenceResolutionTypes';
 
-async function setup(page: Page, options: { blocker?: boolean; unmet?: boolean; overviewFailure?: boolean } = {}) {
+async function setup(page: Page, options: { blocker?: boolean; unmet?: boolean; overviewFailure?: boolean; legacy?: boolean } = {}) {
   const task = makeV2Task(true);
-  task.status = 'error'; task.resume_status = 'needs_review'; task.plan = null; task.document = null; task.review = null;
+  task.status = 'error'; task.resume_status = options.legacy ? 'brief_ready' : 'needs_review'; task.plan = null; task.document = null; task.review = null;
   task.error = '候选卖点关联了没有对应证据的检索请求';
   task.package = makeTask('plan_ready').package;
   task.package!.coverage = [{ request_id: 'r1', status: 'not_found', fact_ids: [], reason: '模拟：该方向缺少依据' }, { request_id: 'r2', status: 'supported', fact_ids: ['fact-1'], reason: '模拟：保留方向有依据' }];
@@ -88,4 +88,14 @@ for (const width of [1440, 390]) test(`planning recovery remains accessible and 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
   await page.screenshot({ path: `qa/screenshots/planning-recovery-${width}.png`, fullPage: false });
+});
+
+test('legacy Planner failure with brief_ready resumes selling points instead of reanalyzing Brief', async ({ page }) => {
+  const { state, local } = await setup(page, { legacy: true });
+  await expect(page.getByText('卖点规划已暂停', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '重新分析需求', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '重新生成卖点建议', exact: true }).click();
+  await expect(page.getByRole('button', { name: '确认卖点，开始写稿', exact: true })).toBeEnabled();
+  expect(local.calls).toEqual([{ path: '/resume-plan', body: { version: 10 } }]);
+  expect(state.writes).toHaveLength(0);
 });
