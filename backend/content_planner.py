@@ -21,7 +21,7 @@ scores四项0到4整数并附reason：audience需求关联、evidence证据直�
 PLAN_PROMPT="""你是Content Planner段落编排阶段，只安排内容、事实和图片，不生成最终文案、不设计平台写作Skills。product_id原样返回。selected_point_ids必须与输入selected_point_ids集合完全一致，不增选、不漏选；每个选中候选至少由一段真实事实承接。排序帮助取舍，不代表段落必须照排名排列。
 不选择固定叙事框架，不输出narrative或framework；用简短composition_rationale解释为什么采用这个先后顺序和段落安排。
 每段有heading（工作人员内部阅读提示）、purpose（写作目标）、reader_question、role、point_ids、fact_ids、image_id、image_reason、image_position、target_chars。argument/objection必须引用事实和选中候选；其他段可无事实，但不得加入未获支持的客观结论。每个point_id必须由本段至少一条对应事实支持，不能只挂编号。各段回答不同问题，保留实质限定，不把内部证据注释当作写作任务。
-只使用选中候选的事实。图片只用已核验图片、不重复凑数，每段至多一图。项目平台契约（不是social Skill）：wechat为before_section/after_section且order=null；xiaohongshu为carousel、moments为grid，order从1连续排列；无图none/order=null。总图数与policy一致，target_chars合计符合budget。CTA只放根级cta，不额外堆CTA段。
+只使用选中候选的事实。图片只用已核验图片、不重复凑数，每段至多一图。项目平台契约（不是social Skill）：wechat为before_section/after_section且order=null；xiaohongshu为carousel、moments为grid，order从1连续排列；无图none/order=null。总图数符合policy硬性范围；recommended_images仅是建议，小红书至少1张，推荐3–6张，不为推荐范围凑图或删图，target_chars合计符合budget。CTA只放根级cta，不额外堆CTA段。
 schema_version为2，保留angle/title_direction/sections/cta契约；title_direction只指内容题目方向，不写实际标题或软文。遵守execution_scope，不恢复已舍弃主题。"""
 
 def digest(value):
@@ -103,6 +103,16 @@ def candidate_context_hash(t):
     from .workflow import PLATFORMS
     return digest(shared_context(t,PLATFORMS[t['platform']]))
 
+def candidate_context_matches(t, saved):
+    if saved==candidate_context_hash(t):return True
+    if t['platform']!='xiaohongshu':return False
+    # Accept only the exact previous policy, with every requirement/fact/asset unchanged.
+    from .workflow import PLATFORMS
+    legacy=dict(PLATFORMS['xiaohongshu'],min_images=3,max_images=6)
+    legacy.pop('recommended_images',None);legacy.pop('image_count_note',None)
+    return saved==digest(shared_context(t,legacy))
+
+
 def rank_candidates(t,result):
     result=P.CandidateBatch.model_validate(result).model_dump()
     if result['product_id']!=t['product_id']:raise ValueError('候选卖点返回了其他型号')
@@ -149,7 +159,7 @@ def trusted_candidates(t):
     check_input(t)
     plan=t.get('plan') or {};a=plan.get('planning_analysis') or {}
     if a.get('origin')!='model' or not a.get('candidates'):raise ValueError('当前没有可信候选卖点，请先完成内容规划')
-    if a.get('candidate_context_hash') and a['candidate_context_hash']!=candidate_context_hash(t):raise ValueError('候选对应的需求或资料已变化，请重新规划，不能沿用旧评分')
+    if a.get('candidate_context_hash') and not candidate_context_matches(t,a['candidate_context_hash']):raise ValueError('候选对应的需求或资料已变化，请重新规划，不能沿用旧评分')
     fields=set(P.SellingPoint.model_fields)
     raw=[]
     for item in a['candidates']:
@@ -171,7 +181,7 @@ def validate(t,plan,enforce_count=True):
     selected_list=plan.get('selected_point_ids') or []
     selected=set(selected_list)
     if generated or bound:validate_selection(t,list(candidates.values()),selected_list)
-    if bound and a.get('candidate_context_hash') and a['candidate_context_hash']!=candidate_context_hash(t):raise ValueError('候选对应的资料或需求已变化，请重新规划')
+    if bound and a.get('candidate_context_hash') and not candidate_context_matches(t,a['candidate_context_hash']):raise ValueError('候选对应的资料或需求已变化，请重新规划')
     covered=set();questions=set();warnings=[];arguments=[]
     for sec in plan['sections']:
         if len(sec['fact_ids'])!=len(set(sec['fact_ids'])):raise ValueError('段落事实编号重复')
@@ -216,7 +226,7 @@ def validate_selection_plan(t, plan):
     if plan.get('phase') != 'selection' or plan.get('sections'):raise ValueError('卖点选择不能包含段落结构')
     a=plan.get('planning_analysis') or {}
     if a.get('origin') != 'model' or not a.get('candidates'):raise ValueError('缺少可信候选卖点')
-    if a.get('candidate_context_hash') != candidate_context_hash(t):raise ValueError('候选对应的需求或资料已变化，请重新选择')
+    if not candidate_context_matches(t,a.get('candidate_context_hash')):raise ValueError('候选对应的需求或资料已变化，请重新选择')
     validate_selection(t,a['candidates'],plan.get('selected_point_ids'))
     er.assert_plan(t,plan)
     # Revalidate saved provenance; never trust IDs merely because they were stored.

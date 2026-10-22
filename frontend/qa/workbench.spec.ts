@@ -41,7 +41,8 @@ test('planner order, removal undo, image uniqueness, and fact source modal', asy
   await page.getByRole('button', { name: '下移段落 1', exact: true }).click();
   await expect(page.getByLabel('段落标题', { exact: true }).first()).toHaveValue('图书馆里，专注学习');
   await page.getByRole('button', { name: '删除段落 1', exact: true }).click();
-  await expect(page.getByRole('button', { name: '确认规划，开始写稿' })).toBeDisabled();
+  // Two distinct images remain valid: 3–6 is a recommendation, not a minimum.
+  await expect(page.getByRole('button', { name: '确认规划，开始写稿' })).toBeEnabled();
   await page.getByRole('button', { name: '撤销移除' }).click();
   await page.getByRole('button', { name: '依据 2', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toContainText('模拟原文：不是 ima 资料');
@@ -194,7 +195,7 @@ test('catalog failure offers retry and no-key state prevents task creation', asy
 });
 
 test('insufficient images or evidence conflict prevents planning confirmation', async ({ page }) => {
-  const task = makeTask('plan_ready'); task.package!.images = task.package!.images.slice(0, 2); task.plan!.sections[2].image_id = null; task.package!.conflicts = ['模拟：不同文档存在型号冲突'];
+  const task = makeTask('plan_ready'); task.package!.images = []; task.plan!.sections.forEach(section => { section.image_id = null; }); task.package!.conflicts = ['模拟：不同文档存在型号冲突'];
   await mockApi(page, task); await page.goto('/');
   await expect(page.getByText(/当前型号素材不足/)).toBeVisible();
   await expect(page.getByRole('button', { name: '确认规划，开始写稿' })).toBeDisabled();

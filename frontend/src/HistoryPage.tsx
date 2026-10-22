@@ -1,0 +1,37 @@
+import { useEffect, useRef, useState } from 'react';
+import { Bookmark, BookOpenText, MessageCircle, CheckCircle2, ChevronRight, FileText, FlaskConical, Plus, RotateCcw, Sparkles } from 'lucide-react';
+import type { Summary } from './types';
+import { Badge, Empty, Field, localTime, PLATFORMS, STATUS } from './shared';
+import { DEMO_CAMPAIGNS, findDemoPost, demoDate, type DemoPost } from './historyEffectsData';
+import useDemoCases from './useDemoCases';
+import Dialog from './Dialog';
+import HistoryPostDetail, { PostMetrics } from './HistoryPostDetail';
+import ReferencePreview from './ReferencePreview';
+import './history-effects.css';
+
+function PlatformMark({platform}:{platform:string}){const Icon=platform==='xiaohongshu'?BookOpenText:platform==='wechat'?FileText:MessageCircle;return <span className={`history-platform-mark is-${platform}`} aria-hidden="true"><Icon size={20} strokeWidth={1.8} /></span>;}
+
+type Modal = { kind:'post'; id:string } | { kind:'reference'; initial?:DemoPost } | { kind:'reset' } | null;
+export default function HistoryPage({ tasks, pending, onOpenTask, onNewTask, initialMode='records' }: { tasks:Summary[]; pending:boolean; onOpenTask:(id:string)=>void; onNewTask:()=>void; initialMode?:'records'|'effects' }) {
+  const [mode,setMode]=useState(initialMode), [onlyCases,setOnlyCases]=useState(false), [platform,setPlatform]=useState('all');
+  const [modal,setModal]=useState<Modal>(null), [toast,setToast]=useState('');
+  const heading=useRef<HTMLHeadingElement>(null);
+  const cases=useDemoCases();
+  useEffect(()=>{if(!toast)return;const timer=window.setTimeout(()=>setToast(''),4000);return()=>window.clearTimeout(timer);},[toast]);
+  function closeModal(){setModal(null);requestAnimationFrame(()=>{if(document.activeElement===document.body)heading.current?.focus();});}
+  function add(id:string){cases.update(id,true);setToast('已加入演示案例库，仅作用于当前浏览器。');}
+  function remove(id:string){cases.update(id,false);setToast('已移出演示案例库。');}
+  const selectedPost=modal?.kind==='post'?findDemoPost(modal.id):undefined;
+  const visible=DEMO_CAMPAIGNS.map(campaign=>({...campaign,posts:campaign.posts.filter(post=>(platform==='all'||post.platform===platform)&&(!onlyCases||cases.ids.includes(post.id)))})).filter(campaign=>campaign.posts.length>0);
+  return <div className="history-page"><header className="page-heading"><div><h1 ref={heading} tabIndex={-1}>历史任务</h1><p>继续创作，也把好写法留作下一次的参考。</p></div><button className="primary" type="button" disabled={pending} onClick={onNewTask}><Plus size={17} aria-hidden="true" />新建任务</button></header>
+    <nav className="history-view-switch" aria-label="历史任务视图"><button type="button" aria-pressed={mode==='records'} onClick={()=>setMode('records')}>任务记录<span>{tasks.length}</span></button><button type="button" aria-pressed={mode==='effects'} onClick={()=>setMode('effects')}>效果演示<span className="history-prototype-tag">功能原型</span></button></nav>
+    {mode==='records'?<><p className="history-records-note">这里保留真实任务的保存与核验状态；发布表现请在“效果演示”中查看模拟样例。</p><div className="task-table">{tasks.length?tasks.map(task=><button type="button" key={task.id} disabled={pending} onClick={()=>onOpenTask(task.id)}><FileText size={20} aria-hidden="true" /><div><strong>{task.title}</strong><small>{localTime(task.updated_at)} · V{task.version}</small></div><span>{PLATFORMS[task.platform]}</span><Badge>{task.status==='approved'?'已核验记录':STATUS[task.status]||'状态待同步'}</Badge><ChevronRight size={18} aria-hidden="true" /></button>):<Empty title="还没有营销任务" text="从一个产品和场景开始，创建你的第一篇图文。" action={<button className="primary" type="button" onClick={onNewTask}>创建营销任务</button>} />}</div></>:<section className="history-effects" aria-label="推广效果演示"><div className="history-demo-banner"><FlaskConical size={20} aria-hidden="true" /><div><strong>效果与经验学习 · 前端演示</strong><p>以下推文、表现数据与经验均为预置示例，未实际发布，也未接入真实 Writer。收藏仅保存在当前浏览器。</p></div></div>{cases.warning&&<p className="notice warning" role="alert">{cases.warning}</p>}
+      <div className="history-demo-toolbar"><div className="history-case-filter" aria-label="演示推文筛选"><button type="button" aria-pressed={!onlyCases} onClick={()=>setOnlyCases(false)}>全部推文</button><button type="button" aria-pressed={onlyCases} onClick={()=>setOnlyCases(true)}><Bookmark size={15} aria-hidden="true" />优秀案例<span>{cases.ids.length}</span></button></div><Field label="筛选发布平台"><select value={platform} onChange={e=>setPlatform(e.target.value)}><option value="all">全部平台</option>{Object.entries(PLATFORMS).map(([id,label])=><option value={id} key={id}>{label}</option>)}</select></Field><div className="history-demo-actions"><button className="secondary" type="button" onClick={()=>setModal({kind:'reference'})}><Sparkles size={16} aria-hidden="true" />预览下次参考</button><button className="text-link" type="button" disabled={!cases.ids.length&&!cases.warning} onClick={()=>setModal({kind:'reset'})}><RotateCcw size={14} aria-hidden="true" />重置演示</button></div></div>
+      {visible.length?visible.map(campaign=><article className="history-campaign" key={campaign.id}><header><div><h2>{campaign.name}</h2><p>{campaign.audience} · {campaign.scene}<span>{demoDate(campaign.date+'T12:00:00+08:00')}</span></p></div><Badge>模拟数据</Badge></header><div className="history-publications">{campaign.posts.map(post=><div className="history-publication" key={post.id}><button type="button" className="history-post-open" onClick={()=>setModal({kind:'post',id:post.id})} aria-label={`查看${PLATFORMS[post.platform]}推文：${post.title}`}><PlatformMark platform={post.platform} /><span><strong>{PLATFORMS[post.platform]}{cases.ids.includes(post.id)&&<span className="history-saved-mark"><Bookmark size={12} aria-hidden="true" />优秀案例</span>}</strong><small>{post.title}</small></span></button><PostMetrics post={post} /><button className="history-view-post text-link" type="button" aria-label={`查看${PLATFORMS[post.platform]}图文与效果：${campaign.scene}`} onClick={()=>setModal({kind:'post',id:post.id})}>查看图文与效果<ChevronRight size={15} aria-hidden="true" /></button></div>)}</div><footer>来源：预置演示数据<span>数据日期 {demoDate(campaign.posts[0].observedAt)}</span></footer></article>):<Empty icon={<Bookmark />} title={onlyCases?'还没有符合筛选的优秀案例':'没有符合筛选的推文'} text={onlyCases?'打开一篇示例推文，点击“加入优秀案例库”，就能把它留在这里。':'调整平台筛选，查看其他演示推文。'} action={<button className="secondary" type="button" onClick={()=>{setOnlyCases(false);setPlatform('all');}}>浏览全部样例</button>} />}
+    </section>}
+    {selectedPost&&<Dialog key={`post-${selectedPost.id}`} title="推文与效果" wide onClose={closeModal}><HistoryPostDetail post={selectedPost} saved={cases.ids.includes(selectedPost.id)} warning={cases.warning} onAdd={add} onRemove={remove} onPreview={post=>setModal({kind:'reference',initial:post})} /></Dialog>}
+    {modal?.kind==='reference'&&<Dialog key="reference-preview" title="预览下次参考" wide onClose={closeModal}><ReferencePreview ids={cases.ids} initial={modal.initial} onOpenPost={id=>setModal({kind:'post',id})} onBrowse={()=>{setOnlyCases(false);setPlatform('all');closeModal();}} /></Dialog>}
+    {modal?.kind==='reset'&&<Dialog key="reset-cases" title="重置演示收藏？" onClose={closeModal}><p>将移除当前浏览器中这项演示的 {cases.ids.length} 篇收藏。真实历史任务、稿件和其他设置均保留。</p><div className="action-bar"><button className="secondary" type="button" onClick={closeModal}>取消</button><button className="primary" type="button" onClick={()=>{cases.reset();closeModal();setToast('当前页面的演示收藏已重置。');}}>确认重置演示</button></div></Dialog>}
+    {toast&&<div className="toast" role="status"><CheckCircle2 size={17} aria-hidden="true" />{toast}</div>}
+  </div>;
+}

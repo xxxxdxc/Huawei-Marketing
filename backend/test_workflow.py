@@ -42,7 +42,9 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):w.validate_plan(t,plan)
     def test_duplicate_image_and_platform_shortage(self):
         t=prepared();t["brief"]["platform"]="xiaohongshu"
-        with self.assertRaises(ValueError):w.validate_plan(t,t["plan"])
+        w.validate_plan(t,t["plan"])
+        empty=copy.deepcopy(t["plan"]);empty["sections"][0]["image_id"]=None
+        with self.assertRaises(ValueError):w.validate_plan(t,empty)
         t["brief"]["platform"]="moments";plan=copy.deepcopy(PLAN);plan["sections"].append(plan["sections"][0]|{"id":"P2"})
         with self.assertRaises(ValueError):w.validate_plan(t,plan)
     def test_fact_quote_must_match_original(self):

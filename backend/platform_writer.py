@@ -42,7 +42,7 @@ STRUCTURE_PROMPT="""你是 Platform Writer 的结构规划阶段，仅输出结�
 每段明确purpose、reader_question、reader_progress（本段新增理解）、connection_to_previous（与前段的具体承接，首段说明为何从此切入），禁止多个段落换句话重复同一结论。
 仅引用选中卖点的事实；argument/objection需绑定point_ids与fact_ids。任何段落的每一个point_id都必须由本段fact_ids中属于该候选的至少一条事实承接，不能只贴卖点标签；没有产品事实的开场或过渡段point_ids与fact_ids都应为空。每项利益必须由所引事实支持，不能把场景假设当成产品能力。
 按平台确定段落长短与用图。图片image_id必须从输入images逐字复制完整ID（不改写、不补全、不根据相似前缀重建）；没有匹配图则用null，绝不编造ID。图片从核验池选，不限于候选预选图，但必须说明与本段的实际画面关联；不把外观当参数证明，不重复使用图片。每段最多一图。
-wechat图片位置before_section/after_section且order=null；xiaohongshu为carousel、moments为grid，序号1起连续；无图none/order=null。总图数遵守policy，target_chars总和符合budget。
+wechat图片位置before_section/after_section且order=null；xiaohongshu为carousel、moments为grid，序号1起连续；无图none/order=null。总图数遵守policy硬性范围；recommended_images仅为建议，小红书至少1张，推荐3–6张，不为推荐范围凑图、补图或删图，target_chars总和符合budget。
 heading仅工作人员阅读提示；CTA仅根级，不另设CTA段。composition_rationale说明全文为什么这样推进，不输出框架名称或最终标题。selected_point_ids和product_id原样保留。
 输出前检查：全文是否围绕main_takeaway、各段是否增加新信息、承接是否具体、卖点是否齐全、用图是否相关。只返回结构化规划。
 """

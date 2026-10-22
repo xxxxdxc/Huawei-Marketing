@@ -19,7 +19,7 @@ def batch(t,selected=('C1',)):
 
 def compose(payload):
     selected=payload['selected_point_ids'];platform=payload['brief']['platform']
-    n=max(len(selected),w.PLATFORMS[platform]['min_images']);images=payload['images']
+    n=max(len(selected),w.PLATFORMS[platform]['min_images'],min(3,len(payload['images'])) if platform=='xiaohongshu' else 0);images=payload['images']
     candidates={c['id']:c for c in payload['ranked_candidates']}
     budget={'moments':100,'wechat':700,'xiaohongshu':400}[platform]
     sections=[]

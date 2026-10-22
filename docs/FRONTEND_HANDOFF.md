@@ -96,7 +96,7 @@ flowchart TD
 ## 5. 比赛规则对界面的约束
 
 - 统一四类结果：场景判断、知识库依据、图文软文、核验结果。可以创新布局，但不能把证据和核验藏到用户无法使用的位置。
-- 小红书 3–6 张图；公众号 2–4 张图；朋友圈 1–3 张图。不能用重复图片凑数。
+- 小红书推荐 3–6 张图（至少 1 张，无推荐上限硬拦截）；公众号 2–4 张图；朋友圈 1–3 张图。不能用重复图片凑数。
 - 换场景须改变内容切入点、卖点优先级；换平台须改变结构、语气、配图和行动引导。
 - 产品事实和图片来自指定 ima 库；无依据价格、补贴、销量、奖项、评价不可生成，不能伪造第一人称体验。
 - 图片非 ima 来源或型号错误，图片引用项可能计 0；虚构价格等会使相应任务准确性与合规性计 0。不能用漂亮界面掩盖这些限制。
@@ -318,3 +318,6 @@ npm run build
 ## 0.5.0 资料审查局部取舍与重查
 
 接口与完整请求/响应示例见 [EVIDENCE_RESOLUTION.md](EVIDENCE_RESOLUTION.md)。新增 GET /api/tasks/{id}/evidence-review、POST /evidence-resolution/preview、POST /evidence-resolution/confirm、POST /refresh-evidence（后3项均在 /api/tasks/{id} 下）。预览只读；确认需 version、preview_id、confirmed=true 及受影响约束的明确授权。复用资料后停 plan_ready，不自动写稿。原始 Brief/确认哈希/coverage 保留；execution_scope 和 resolution_history 单独记录。取舍边界贯穿规划、写稿、核验、修订与手动编辑后的核验。任务级上传未实现，补入原 ima 或替换固定路径 ZIP 后使用 refresh-evidence；该入口实际重取资料并接受新 ZIP 快照。/modify 整体变更仍失效当前各阶段产物；/replan 与 /resume-plan 不作为任意降级接口。FactRequest 新增可选 depends_on、waivable、guardrail，不改写历史已确认 Brief。
+
+
+小红书配图：至少 1 张不同的已核验图片；3–6 张仅作推荐，不因偏离推荐范围阻塞、强制补图或删图。公众号与朋友圈数量规则不变。

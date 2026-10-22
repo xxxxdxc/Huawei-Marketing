@@ -8,7 +8,7 @@ from .content_layout import effective_layout,validate_layout
 from . import publication_rules as pub,store_marketing as sm,numeric_evidence as ne,review_guard as rg
 
 PLATFORMS={
- "xiaohongshu":dict(name="小红书",min_images=3,max_images=6,words="300—500字",style="口语化标题、短段落、具体场景、话题标签；不得伪造第一人称体验"),
+ "xiaohongshu":dict(name="小红书",min_images=1,max_images=None,recommended_images=[3,6],image_count_note="至少1张；推荐3–6张，仅作建议，不因少于3张或多于6张暂停、补图或删图",words="300—500字",style="口语化标题、短段落、具体场景、话题标签；不得伪造第一人称体验"),
  "wechat":dict(name="公众号",min_images=2,max_images=4,words="600—900字",style="标题、导语、分节解释、结尾引导；适合完整阅读"),
  "moments":dict(name="门店朋友圈",min_images=1,max_images=3,words="80—150字",style="一个核心卖点、简短场景描述、咨询或到店引导"),
 }
@@ -55,8 +55,15 @@ def validate_plan(t, plan, enforce_count=True):
     if plan.get("schema_version") in ("2","3"):cp.validate(t,plan,enforce_count)
     if enforce_count:
         policy=PLATFORMS[t["brief"]["platform"]]
-        if not policy["min_images"]<=len(used)<=policy["max_images"]:
-            raise ValueError(f"{policy['name']}需使用{policy['min_images']}—{policy['max_images']}张不同图片，目前为{len(used)}张")
+        if error:=image_count_error(policy,len(used)):raise ValueError(error)
+
+def image_count_error(policy, count):
+    maximum=policy["max_images"]
+    if count>=policy["min_images"] and (maximum is None or count<=maximum):return None
+    requirement=(f"至少{policy['min_images']}张不同图片" if maximum is None
+                 else f"{policy['min_images']}—{maximum}张不同图片")
+    return f"{policy['name']}需使用{requirement}，目前为{count}张"
+
 
 def effective_plan(t):
     """Apply only image edits recorded by the explicit user document-save endpoint."""
@@ -96,8 +103,7 @@ def record_user_image_edits(t, document):
     if len(used)!=len(set(used)):
         raise ValueError("请勿在成稿中重复使用同一张图片")
     policy=PLATFORMS[t["brief"]["platform"]]
-    if not policy["min_images"]<=len(used)<=policy["max_images"]:
-        raise ValueError(f"{policy['name']}需使用{policy['min_images']}—{policy['max_images']}张不同图片，目前为{len(used)}张")
+    if error:=image_count_error(policy,len(used)):raise ValueError(error)
     previous={p["section_id"]:p for p in t["document"]["paragraphs"]}
     overrides=copy.deepcopy(t.get("user_image_overrides") or {})
     for paragraph in document["paragraphs"]:
@@ -142,7 +148,7 @@ def deterministic_review(t):
                 issues.append(issue('platform','必须内容','成稿遗漏用户必须内容：'+req['request_id']))
     if len(used)!=len(set(used)):issues.append(issue("image","配图方案","同一张图片被重复使用"))
     policy=PLATFORMS[t["brief"]["platform"]]
-    if not policy["min_images"]<=len(set(used))<=policy["max_images"]:issues.append(issue("image","配图方案",f"{policy['name']}要求{policy['min_images']}—{policy['max_images']}张不同图片",False))
+    if error:=image_count_error(policy,len(set(used))):issues.append(issue("image","配图方案",error,False))
     text=pub.reader_text(d)
     for match in re.finditer(r"全网最低|行业第一|百分之百|100%保证|绝对领先|永久免费|零风险|闭眼入|最强|保证不卡",text):issues.append(issue("compliance","全文",f"发现需删除或改写的宣传表达：{match.group()}"))
     if re.search(r"我(?:用了|使用了|亲测|买了)|自用\d|用了[半一二三四五六七八九十]+[年月]",text):issues.append(issue("compliance","全文","疑似未经证实的个人使用体验"))
@@ -427,7 +433,7 @@ async def review(t, allow_repair=False):
     rule_issues=deterministic_review(t)
     chosen={p["image_id"] for p in t["document"]["paragraphs"] if p["image_id"]}
     images=[i for i in t["package"]["images"] if i["id"] in chosen]
-    ai=await llm.complete(get_settings()["reviewer_model"],BASE+pub.REVIEWER+ne.GUIDANCE+rg.GUIDANCE+(pw.REVIEW_GUIDANCE if t.get("writer_voice_version")==pw.VOICE_VERSION else "")+(sm.GUIDANCE if t.get("store_marketing_version")==sm.VERSION else "")+"你是独立Fact Reviewer。重新扫描完整成稿，包括标题、导语、正文、图片说明、标签和行动引导，不能只核对Writer自报的事实编号。把每个客观陈述对照原文；发现省略会改变结论的必要条件、型号混淆、价格权益虚构、伪造体验、无依据比较、图片画面冲突和平台不适配时逐项报告。资料无法支持或冲突属于evidence且repairable=false；可删除夸大表达或自然补足必要限定词的写作问题repairable=true。plan 已包含用户在成稿编辑时明确授权的配图调整；不要仅因图片与最初规划不同就报错，仍须检查实际画面、型号、来源和图文匹配。按content_policy自动省略价格优惠属于已授权降级，不因未满足原始价格要求而报错；必须检查标题、正文、图注、标签和实际画面是否重新出现被省略的金额或政策。新版任务必须围绕plan.selected_point_ids，核对标题、导语、正文、图注与标签是否偷偷新增未选卖点或遗漏已选卖点；卖点映射见selected_points。没有问题时issues为空。不要宣称完成了实际未进行的图片核验。",dict(brief=ba.context(t),selected_points=[c for c in (t['plan'].get('planning_analysis') or {}).get('candidates',[]) if c['id'] in (t['plan'].get('selected_point_ids') or [])],plan=effective_plan(t),render_layout=effective_layout(effective_plan(t),t["platform"],t["document"]),user_image_overrides=t.get("user_image_overrides",{}),document=t["document"],package=er.package_for_model(t),rules=rule_issues,numeric_checks=ne.audit(t),publication_policy_version=t.get("publication_policy_version"),writer_voice_version=t.get("writer_voice_version"),store_marketing=sm.payload(t) if t.get("store_marketing_version")==sm.VERSION else None,condition_presentation=pub.condition_guidance(t["package"]["facts"]),vision_enabled=get_settings()["vision"],review_scope=rg.context(t)),S.Review,images=images if get_settings()["vision"] else None,role="reviewer")
+    ai=await llm.complete(get_settings()["reviewer_model"],BASE+pub.REVIEWER+ne.GUIDANCE+rg.GUIDANCE+(pw.REVIEW_GUIDANCE if t.get("writer_voice_version")==pw.VOICE_VERSION else "")+(sm.GUIDANCE if t.get("store_marketing_version")==sm.VERSION else "")+"你是独立Fact Reviewer。小红书至少1张不同图片，3–6张仅为推荐，1、2或超过6张本身不是核验问题，不要求为了该推荐增删图片。重新扫描完整成稿，包括标题、导语、正文、图片说明、标签和行动引导，不能只核对Writer自报的事实编号。把每个客观陈述对照原文；发现省略会改变结论的必要条件、型号混淆、价格权益虚构、伪造体验、无依据比较、图片画面冲突和平台不适配时逐项报告。资料无法支持或冲突属于evidence且repairable=false；可删除夸大表达或自然补足必要限定词的写作问题repairable=true。plan 已包含用户在成稿编辑时明确授权的配图调整；不要仅因图片与最初规划不同就报错，仍须检查实际画面、型号、来源和图文匹配。按content_policy自动省略价格优惠属于已授权降级，不因未满足原始价格要求而报错；必须检查标题、正文、图注、标签和实际画面是否重新出现被省略的金额或政策。新版任务必须围绕plan.selected_point_ids，核对标题、导语、正文、图注与标签是否偷偷新增未选卖点或遗漏已选卖点；卖点映射见selected_points。没有问题时issues为空。不要宣称完成了实际未进行的图片核验。",dict(brief=ba.context(t),selected_points=[c for c in (t['plan'].get('planning_analysis') or {}).get('candidates',[]) if c['id'] in (t['plan'].get('selected_point_ids') or [])],plan=effective_plan(t),render_layout=effective_layout(effective_plan(t),t["platform"],t["document"]),user_image_overrides=t.get("user_image_overrides",{}),document=t["document"],package=er.package_for_model(t),rules=rule_issues,numeric_checks=ne.audit(t),publication_policy_version=t.get("publication_policy_version"),writer_voice_version=t.get("writer_voice_version"),store_marketing=sm.payload(t) if t.get("store_marketing_version")==sm.VERSION else None,condition_presentation=pub.condition_guidance(t["package"]["facts"]),vision_enabled=get_settings()["vision"],review_scope=rg.context(t),platform_policy=PLATFORMS[t["platform"]]),S.Review,images=images if get_settings()["vision"] else None,role="reviewer")
     ai_issues,scope_audit,validation_errors=rg.check(t,ai["issues"])
     issues=rule_issues+ai_issues
     # Image replacement/selection is not a text-edit operation, including program findings.

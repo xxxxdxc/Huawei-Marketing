@@ -146,3 +146,15 @@ https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/comm
 - 新增15项平台适配回归，全量122项全部通过（1.9分钟）；生产构建通过。额外1项原确认记录截图检查通过。当前results.json为末次截图检查；全量报告保存于screenshots/platform-adaptation-full-results.json（忽略文件）。
 - 已目视检查1440px/390px适配状态、原确认卖点与证据；axe基础无障碍与无横向溢出通过。未调用真实模型、未向真实任务写入。
 - 仅修改frontend/。本轮后端8765检查时未运行，已通知原后端对话恢复；5174前端预览已启动。真实API平台切换未重跑，未推送部署。详见../PLATFORM_ADAPTATION_UI.md。
+
+## 2026-10-22 历史任务效果与经验学习展示
+
+- 历史任务保留真实任务记录，新增“效果演示”视图；三组推广任务、九篇三平台图文及表现指标均为明确标注的预置示例。无真实发布链接时直说未发布，朋友圈浏览与收藏缺失使用“—”。
+- 支持查看全文和示意配图、手动加入/移出优秀案例、预置写法分析、优秀案例/平台筛选，以及页内“预览下次参考”。仅按收藏的平台和场景模拟匹配，不影响实际 Writer。
+- 收藏采用独立 localStorage 键 hw-demo-history-cases-v1；刷新保留、跨标签页同步、确认重置、损坏恢复、存储拒绝时当前页提示均已覆盖。取消模拟提炼不会隐式收藏；重置不清理真实任务或其他设置。
+- App 只将原历史页提取为懒加载 HistoryPage；新增开发入口 ?preview=history-effects，复用相同组件且无需后端。没有新增网络接口、模型调用或真实 References 写入，原两次确认及编辑后复核流程保持。
+- 使用 frontend-design、ui-ux-pro-max 和 React 最佳实践实现，按 web-design-guidelines 检查语义按钮、表单标签、操作反馈、原生弹窗、焦点、图像尺寸和响应式布局。
+- 构建通过；新功能 14 项专项全部通过；最终完整 Playwright 回归 **147 passed（2.3 分钟）**。首轮全量出现两条旧配图断言失败，核对当前接口契约后将测试同步为小红书至少1张、3–6张仅推荐；相关业务实现未在本轮修改。最终全量报告保存在 screenshots/history-effects-full-results.json。
+- 已实际查看桌面与手机列表、收藏详情及下次参考截图；1440px、768px、390px 的列表/详情/匹配视图通过 axe WCAG2A/AA/21AA 检查，列表无横向溢出。原生 Escape 关闭与操作后的焦点回退经过浏览器测试。
+- 截图：screenshots/history-effects-{1440,768,390}.png、history-case-{1440,768,390}.png、history-reference-{1440,768,390}.png。均为隔离演示数据，不代表真实推广表现或模型质量。
+- 本轮修改只在 frontend/；未改后端，未向真实任务写入，未推送或部署。使用说明与文件分工见 ../HISTORY_EFFECTS_DEMO.md。

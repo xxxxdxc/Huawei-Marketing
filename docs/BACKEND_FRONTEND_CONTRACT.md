@@ -109,3 +109,9 @@ paragraph.heading继续用于工作人员定位，不进入实际推文预览、
 ## 核验范围与文字修订（2026-10-21）
 
 Document/Plan及所有写入端点保持兼容；内部repair改为TextRepair，只输出文字/图注修改项，图片、事实编号和顺序由程序固定。review新增可选validation_errors、scope_audit、repair_decision、raw_model_issues/raw_model_summary。validation_errors非空时不可导出，显示核验意见需复核；图片问题进入现有配图编辑。原始意见和程序复核依据保留。首次报告和失败修订输出不再丢失。细节见[REVIEW_SCOPE_AND_REPAIR.md](REVIEW_SCOPE_AND_REPAIR.md)。
+
+
+小红书配图：至少 1 张不同的已核验图片；3–6 张仅作推荐，不因偏离推荐范围阻塞、强制补图或删图。公众号与朋友圈数量规则不变。
+
+旧小红书任务兼容：仅接受按原 `min_images=3,max_images=6` 平台 policy 计算的精确候选上下文哈希；需求、事实及图片等上下文仍须一致，不能借规则升级沿用变化后的旧候选。
+验证：453 项后端回归、29 项相关浏览器回归及 TypeScript/Vite 构建通过。截图任务保留原 Brief、资料与卖点，以两张图完成 Writer 和独立核验（V53 approved）。本机恢复记录位于忽略目录 `.local/image-count-recovery/`。

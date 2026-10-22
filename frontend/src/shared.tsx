@@ -6,8 +6,8 @@ import type { Task, Asset } from './types';
 import { isPlatformAdaptation } from './platformPresentation';
 
 export const PLATFORMS: Record<string, string> = { xiaohongshu: '小红书', wechat: '微信公众号', moments: '门店朋友圈' };
-export const POLICIES: Record<string, { min: number; max: number; note: string }> = {
-  xiaohongshu: { min: 3, max: 6, note: '用具体场景展开，短段落配合话题标签；不编造亲身体验。' },
+export const POLICIES: Record<string, { min: number; max: number; recommended?: string; note: string }> = {
+  xiaohongshu: { min: 1, max: Infinity, recommended: '3–6', note: '用具体场景展开，短段落配合话题标签；不编造亲身体验。' },
   wechat: { min: 2, max: 4, note: '用导语、分节说明与行动引导组织完整文章。' },
   moments: { min: 1, max: 3, note: '聚焦一个核心卖点，用简短场景引导咨询或到店。' },
 };
