@@ -155,6 +155,42 @@ class StoreMarketingTests(unittest.TestCase):
         self.assertEqual(t['store_marketing_context'],context());self.assertTrue(w.can_export(t))
         self.assertTrue(calls[1][1]['store_marketing_policy']['enabled'])
         self.assertEqual(calls[2][1]['store_marketing']['store_marketing_context'],context())
+    def test_empty_outline_cta_recovers_only_enabled_generic_closing(self):
+        for platform in ('moments','xiaohongshu','wechat'):
+            for empty in ('','   '):
+                with self.subTest(platform=platform,empty=empty):
+                    t=task(platform=platform,legacy=False)
+                    payload=cp.shared_context(t,w.PLATFORMS[platform])|dict(selected_points=t['plan']['planning_analysis']['candidates'],selected_point_ids=t['plan']['selected_point_ids'])
+                    raw=outline(payload);raw['cta']=empty
+                    fixed,_=pw.validate_outline(t,t['plan'],raw)
+                    self.assertEqual(fixed['cta'],empty if platform=='wechat' else '欢迎私信了解我们的门店。')
+                    self.assertEqual(raw['cta'],empty)
+    def test_empty_cta_does_not_replace_provided_store_identity(self):
+        t=self.selected();t['dialogue']=[dict(id='U1',kind='user',text=TEXT)]
+        payload=cp.shared_context(t,w.PLATFORMS[t['platform']])|dict(selected_points=t['plan']['planning_analysis']['candidates'],selected_point_ids=t['plan']['selected_point_ids'])
+        raw=outline(payload);raw['store_context']=context();raw['cta']=''
+        with self.assertRaisesRegex(ValueError,'所在门店'):pw.validate_outline(t,t['plan'],raw)
+    def test_nonempty_invalid_cta_is_not_silently_replaced(self):
+        t=self.selected()
+        payload=cp.shared_context(t,w.PLATFORMS[t['platform']])|dict(selected_points=t['plan']['planning_analysis']['candidates'],selected_point_ids=t['plan']['selected_point_ids'])
+        raw=outline(payload);raw['cta']='明天更精彩。'
+        with self.assertRaisesRegex(ValueError,'所在门店'):pw.validate_outline(t,t['plan'],raw)
+    def test_generic_cta_recovery_continues_through_draft_and_review(self):
+        t=self.selected();calls=[]
+        async def fake(model,system,payload,schema,**kw):
+            calls.append(schema)
+            if schema is P.WriterOutline:
+                r=outline(payload);r['cta']='';return r
+            if schema is S.Document:
+                d=document(payload['plan']);d['cta']='';return d
+            return dict(summary='synthetic',issues=[])
+        with patch.object(w.llm,'complete',AsyncMock(side_effect=fake)):asyncio.run(w.write(t))
+        self.assertEqual(calls,[P.WriterOutline,S.Document,S.Review])
+        self.assertEqual(t['writer_runs'][1]['recoveries'][0]['kind'],'generic_store_cta')
+        self.assertEqual(t['writer_runs'][0]['recoveries'][0]['kind'],'generic_store_cta')
+        self.assertEqual(t['document']['cta'],'欢迎私信了解我们的门店。')
+        self.assertTrue(w.can_export(t))
+
     def test_hallucinated_store_context_stops_before_draft(self):
         t=self.selected();t['dialogue']=[dict(id='U1',kind='user',text=TEXT)]
         async def fake(model,system,payload,schema,**kw):

@@ -63,7 +63,10 @@ def validate_outline(t,selection,result):
     result=P.WriterOutline.model_validate(result).model_dump()
     context=sm.checked_context(t,result.get('store_context') or t.get('store_marketing_context'))
     result['store_context']=context
-    # Reject forbidden/missing store closing before drafting, without inventing one.
+    # Missing operator details are nonblocking; use the already authorized default.
+    store_policy=sm.policy(t,context)
+    if store_policy['enabled'] and not store_policy['details'] and not result['cta'].strip():
+        result['cta']='欢迎私信了解我们的门店。'
     stub=dict(title='',lead='',paragraphs=[],tags=[],cta=result['cta'])
     store_errors=sm.document_issues(t,stub,context)
     if store_errors:raise ValueError(store_errors[0]['detail'])
@@ -109,6 +112,10 @@ async def compose(t,base):
         except ValueError:
             run['rejected_outline']=copy.deepcopy(raw)
             raise
+        if outline['cta']!=raw['cta']:
+            run['recoveries']=[dict(kind='generic_store_cta',policy_version=sm.VERSION,reason='empty_cta_without_store_details',
+                original_cta=raw['cta'],cta=outline['cta'])]
+            event(t,'Writer大纲缺少门店结尾，已按平台规则补入通用邀请；未添加门店资料或服务承诺')
         run.update(status='complete',output_hash=cp.digest(outline))
         t['plan']=composed;t['writer_outline']=outline
         t['store_marketing_context']=copy.deepcopy(outline['store_context'])
@@ -198,7 +205,14 @@ async def document_call(t,base,payload,schema,stage):
         if stage=='repair':
             run['text_patch']=copy.deepcopy(raw)
             result=apply_text_repair(payload,raw)
-        else:result=raw
+        else:
+            result=raw
+            policy=payload['store_marketing_policy']
+            if policy['enabled'] and not policy['details'] and not result['cta'].strip():
+                result=copy.deepcopy(raw)
+                result['cta']='欢迎私信了解我们的门店。'
+                run['recoveries']=[dict(kind='generic_store_cta',policy_version=sm.VERSION,
+                    reason='empty_cta_without_store_details',original_cta=raw['cta'],cta=result['cta'])]
         run.update(status='complete',output_hash=cp.digest(result));return result
     except Exception as exc:
         if stage=='repair' and 'raw' in locals():run['rejected_output']=copy.deepcopy(raw)
