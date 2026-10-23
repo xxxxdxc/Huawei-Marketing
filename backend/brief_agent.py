@@ -239,6 +239,8 @@ async def run(t, products, persist):
     a["audience_insight"]=await stage("audience",dict(requirements=requirements),S.AudienceInsight)
     strategy=await stage("strategy",dict(requirements=requirements,audience_insight=a["audience_insight"],commercial_requests=a["commercial_requests"],platform=PLATFORM_NAMES[t["platform"]]),S.StrategyResult)
     strategy=S.StrategyResult.model_validate(ep.normalize_strategy(strategy,a["commercial_requests"])).model_dump()
+    # Retain the compatibility field but never publish an upstream CTA draft.
+    strategy['message_strategy']['cta_direction']=''
     a.update(strategy)
     t["brief_analysis"]=S.MarketingBrief.model_validate(a).model_dump()
     t["brief"]=projection(a);t["status"]="brief_ready";t["resume_status"]="brief_ready";t["error"]=None

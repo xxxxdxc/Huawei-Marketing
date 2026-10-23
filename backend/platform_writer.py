@@ -43,7 +43,7 @@ STRUCTURE_PROMPT="""你是 Platform Writer 的结构规划阶段，仅输出结�
 仅引用选中卖点的事实；argument/objection需绑定point_ids与fact_ids。任何段落的每一个point_id都必须由本段fact_ids中属于该候选的至少一条事实承接，不能只贴卖点标签；没有产品事实的开场或过渡段point_ids与fact_ids都应为空。每项利益必须由所引事实支持，不能把场景假设当成产品能力。
 按平台确定段落长短与用图。图片image_id必须从输入images逐字复制完整ID（不改写、不补全、不根据相似前缀重建）；没有匹配图则用null，绝不编造ID。图片从核验池选，不限于候选预选图，但必须说明与本段的实际画面关联；不把外观当参数证明，不重复使用图片。每段最多一图。
 wechat图片位置before_section/after_section且order=null；xiaohongshu为carousel、moments为grid，序号1起连续；无图none/order=null。总图数遵守policy硬性范围；recommended_images仅为建议，小红书至少1张，推荐3–6张，不为推荐范围凑图、补图或删图，target_chars总和符合budget。
-heading仅工作人员阅读提示；CTA仅根级，不另设CTA段。composition_rationale说明全文为什么这样推进，不输出框架名称或最终标题。selected_point_ids和product_id原样保留。
+heading仅工作人员阅读提示；CTA文案从本阶段才开始生成，不沿用Brief或Planner的旧CTA。按store_marketing_policy处理：公众号product_only时根级cta可空或只作产品自然收尾，禁止门店营销；小红书/朋友圈在根级承接门店。不要为了通用copywriting的CTA建议覆盖平台规则。CTA仅根级，不另设CTA段。composition_rationale说明全文为什么这样推进，不输出框架名称或最终标题。selected_point_ids和product_id原样保留。
 输出前检查：全文是否围绕main_takeaway、各段是否增加新信息、承接是否具体、卖点是否齐全、用图是否相关。只返回结构化规划。
 """
 DRAFT_PROMPT="""你是 Platform Writer 的正文阶段。根据内部已校验的结构规划完成单篇营销图文。
@@ -69,6 +69,11 @@ def validate_outline(t,selection,result):
         result['cta']='欢迎私信了解我们的门店。'
     stub=dict(title='',lead='',paragraphs=[],tags=[],cta=result['cta'])
     store_errors=sm.document_issues(t,stub,context)
+    if store_errors and not store_policy['enabled']:
+        # Only remove the unauthorized store closing, never skip context or structure checks.
+        result['cta']=''
+        stub['cta']=''
+        store_errors=sm.document_issues(t,stub,context)
     if store_errors:raise ValueError(store_errors[0]['detail'])
     if result['product_id']!=t['product_id']:raise ValueError('Writer结构返回其他型号')
     chosen=selection['selected_point_ids']
@@ -113,9 +118,11 @@ async def compose(t,base):
             run['rejected_outline']=copy.deepcopy(raw)
             raise
         if outline['cta']!=raw['cta']:
-            run['recoveries']=[dict(kind='generic_store_cta',policy_version=sm.VERSION,reason='empty_cta_without_store_details',
+            removed=not sm.policy(t,outline['store_context'])['enabled']
+            run['recoveries']=[dict(kind='remove_unauthorized_store_cta' if removed else 'generic_store_cta',
+                policy_version=sm.VERSION,reason='wechat_product_only' if removed else 'empty_cta_without_store_details',
                 original_cta=raw['cta'],cta=outline['cta'])]
-            event(t,'Writer大纲缺少门店结尾，已按平台规则补入通用邀请；未添加门店资料或服务承诺')
+            event(t,'Writer已清除公众号大纲中未授权的门店CTA，继续产品宣传' if removed else 'Writer大纲缺少门店结尾，已按平台规则补入通用邀请；未添加门店资料或服务承诺')
         run.update(status='complete',output_hash=cp.digest(outline))
         t['plan']=composed;t['writer_outline']=outline
         t['store_marketing_context']=copy.deepcopy(outline['store_context'])

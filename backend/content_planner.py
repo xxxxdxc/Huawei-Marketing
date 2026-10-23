@@ -255,7 +255,7 @@ def selection_plan(t, candidates, selected, input_hash=None):
     brief=ba.context(t)
     result=dict(schema_version='3',phase='selection',product_id=t['product_id'],
         angle=brief.get('strategy') or brief.get('goal') or '依据已核验事实选择核心卖点',
-        title_direction='',sections=[],cta=(ba.context(t).get('message_strategy') or {}).get('cta_direction') or brief.get('goal','咨询'),
+        title_direction='',sections=[],cta='',
         selected_point_ids=list(selected),planning_analysis=dict(status='generated',origin='model',
             candidates=copy.deepcopy(candidates),weights=WEIGHTS,input_hash=input_hash,
             candidate_context_hash=candidate_context_hash(t),selection_contract='2',

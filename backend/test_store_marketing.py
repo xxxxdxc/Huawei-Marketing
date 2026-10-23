@@ -191,6 +191,47 @@ class StoreMarketingTests(unittest.TestCase):
         self.assertEqual(t['document']['cta'],'欢迎私信了解我们的门店。')
         self.assertTrue(w.can_export(t))
 
+    def test_selection_never_inherits_cta_from_brief(self):
+        for platform in ('wechat','moments','xiaohongshu'):
+            t=task(platform=platform,legacy=False)
+            self.assertEqual(t['plan']['cta'],'')
+            self.assertEqual(t['plan']['sections'],[])
+    def test_wechat_outline_clears_only_unauthorized_store_cta(self):
+        t=task(platform='wechat',legacy=False)
+        payload=cp.shared_context(t,w.PLATFORMS['wechat'])|dict(selected_points=t['plan']['planning_analysis']['candidates'],selected_point_ids=t['plan']['selected_point_ids'])
+        for cta in ('欢迎私信了解我们的门店。','愿工作日多一份从容。',''):
+            raw=outline(payload);raw['cta']=cta
+            fixed,_=pw.validate_outline(t,t['plan'],raw)
+            self.assertEqual(fixed['cta'],'' if '门店' in cta else cta)
+            self.assertEqual(raw['cta'],cta)
+        raw=outline(payload);raw['cta']='欢迎到店';raw['product_id']='wrong'
+        with self.assertRaisesRegex(ValueError,'其他型号'):pw.validate_outline(t,t['plan'],raw)
+    def test_wechat_explicit_exception_preserves_store_cta(self):
+        t=task(platform='wechat',legacy=False);text='这篇公众号也要加入门店营销。'
+        t['dialogue']=[dict(id='U1',kind='user',text=text)]
+        payload=cp.shared_context(t,w.PLATFORMS['wechat'])|dict(selected_points=t['plan']['planning_analysis']['candidates'],selected_point_ids=t['plan']['selected_point_ids'])
+        raw=outline(payload);raw['store_context']=dict(details=[],wechat_exception=dict(turn_id='U1',quote=text));raw['cta']='欢迎私信了解我们的门店。'
+        fixed,_=pw.validate_outline(t,t['plan'],raw)
+        self.assertEqual(fixed['cta'],raw['cta'])
+    def test_wechat_outline_recovery_continues_but_draft_leak_is_reviewed(self):
+        t=task(platform='wechat',legacy=False)
+        t['selection_confirmation']=dict(selection_hash=cp.selection_fingerprint(t['plan']))
+        calls=[]
+        async def fake(model,system,payload,schema,**kw):
+            calls.append(schema)
+            if schema is P.WriterOutline:
+                r=outline(payload);r['cta']='欢迎到店咨询。';return r
+            if schema is S.Document:
+                d=document(payload['plan']);d['cta']='欢迎到店咨询。';return d
+            if schema is S.TextRepair:return dict(root_changes=dict(cta=''),paragraph_changes=[])
+            return dict(summary='synthetic',issues=[])
+        with patch.object(w.llm,'complete',AsyncMock(side_effect=fake)):asyncio.run(w.write(t))
+        self.assertEqual(t['writer_outline']['cta'],'')
+        self.assertEqual(t['writer_runs'][0]['recoveries'][0]['kind'],'remove_unauthorized_store_cta')
+        self.assertIn(S.TextRepair,calls)
+        self.assertEqual(calls.count(S.Review),2)
+        self.assertEqual(t['document']['cta'],'');self.assertTrue(w.can_export(t))
+
     def test_hallucinated_store_context_stops_before_draft(self):
         t=self.selected();t['dialogue']=[dict(id='U1',kind='user',text=TEXT)]
         async def fake(model,system,payload,schema,**kw):

@@ -92,6 +92,6 @@
     "dengqikuang/wechat-article-skills/wechat-article-writing"
   ],
   "writer_adapter": "writer_skills.md",
-  "writer_adapter_sha256": "69fef63e1e9f4090f8ea474430c3a7b5cb9daa07ff9a6748a89b6379d4aebd30",
+  "writer_adapter_sha256": "ea684b02d431eaa11302668f75baf1183c6c509b1f2621e0853c970f43ec394e",
   "writer_case_manifest": "references/platform-writer/cases.json"
 }

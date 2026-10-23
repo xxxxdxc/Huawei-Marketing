@@ -2390,8 +2390,8 @@
           "cta_direction": {
             "type": "string",
             "maxLength": 500,
-            "minLength": 1,
-            "title": "Cta Direction"
+            "title": "Cta Direction",
+            "description": "兼容字段，Brief阶段留空；CTA文案由Platform Writer按当前平台生成"
           },
           "tone": {
             "type": "string",

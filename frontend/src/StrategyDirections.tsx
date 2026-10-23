@@ -36,7 +36,7 @@ export default function StrategyDirections({ task }: { task: Task }) {
       </li>;
     })}</ul>
     <details className="brief-details"><summary>查看原主题与切入角度（策略草案）</summary><p>{strategy.theme}</p><p>{strategy.angle}</p></details>
-    <p>表达语气：{strategy.tone}</p><p>行动引导：{strategy.cta_direction}</p>
+    <p>表达语气：{strategy.tone}</p><p>行动引导：由 Platform Writer 按当前平台生成</p>
     {target && <EvidenceDialog task={task} target={target} onClose={() => setTarget(null)} />}
   </section>;
 }

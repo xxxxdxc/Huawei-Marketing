@@ -302,7 +302,7 @@ class MessageStrategy(Strict):
     reason: str = Field(min_length=1, max_length=1000)
     priorities: list[SellingDirection] = Field(min_length=1, max_length=5)
     angle: str = Field(min_length=1, max_length=500)
-    cta_direction: str = Field(min_length=1, max_length=500)
+    cta_direction: str = Field(max_length=500, description="兼容字段，Brief阶段留空；CTA文案由Platform Writer按当前平台生成")
     tone: str = Field(min_length=1, max_length=300)
 
 class FactRequest(Strict):

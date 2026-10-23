@@ -136,3 +136,7 @@ coverage.status 新增 partial，fact_ids 保留已有支持；missing_details�
 ## 2026-10-22：摘录与首次商城补充
 
 详见 [EVIDENCE_INGESTION.md](EVIDENCE_INGESTION.md)。Package 保留 `quote_repairs`（原摘录及真实连续原文定位）、`rejected_facts`、`unresolved_fact_ids`、`omitted_product_requests`、`supplement_attempts` 等只读审计。普通检索priority不等于文案必写；仍执行已确认的真实门槛。华为商城逐来源标记，不冒称来自ima；原事实ID保持，新来源增量加入。
+
+### CTA 阶段与平台边界
+
+Brief 的 `message_strategy.cta_direction` 作为兼容字段保留，新分析写入空字符串；营销目标和用户原话仍保留。schema 3 的 selection 阶段 `plan.cta` 为空，只有 Writer 的 composed 阶段生成 CTA 文案。公众号默认 product_only，大纲中未授权门店 CTA 会记录并清除后继续，合法产品收尾保留；正文仍须修订和完整复核。明确的公众号门店授权继续支持，小红书/朋友圈无门店资料使用通用邀请。历史 Brief 不回写，旧 CTA 不作为新授权。
